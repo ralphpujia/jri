@@ -1,3 +1,4 @@
+import logging
 import subprocess
 from pathlib import Path
 
@@ -39,3 +40,20 @@ def _get_ralph_bot_github_token() -> str:
         return ""
 
 RALPH_BOT_GITHUB_TOKEN: str = _get_ralph_bot_github_token()
+
+# ── Startup validation ──
+_REQUIRED = {
+    "GITHUB_CLIENT_ID": GITHUB_CLIENT_ID,
+    "GITHUB_CLIENT_SECRET": GITHUB_CLIENT_SECRET,
+    "SECRET_KEY": SECRET_KEY,
+}
+_missing = [name for name, val in _REQUIRED.items() if not val]
+if _missing:
+    raise RuntimeError(
+        f"Missing required environment variables: {', '.join(_missing)}"
+    )
+
+if not STRIPE_SECRET_KEY:
+    logging.getLogger(__name__).warning(
+        "STRIPE_SECRET_KEY not set — Stripe payments will not work"
+    )
