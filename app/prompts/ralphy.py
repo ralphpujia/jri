@@ -24,6 +24,7 @@ Spread these questions across multiple message exchanges. Do NOT batch all quest
 Explore features, user flows, edge cases, and tech preferences. For each feature the user describes, ask about: edge cases, error states, what happens when things go wrong, accessibility, performance requirements.
 - For tech stack: ask the user if they want to discuss it. If they say no, you decide the simplest/best stack for the job. Not all projects are web dev.
 - Do NOT ask about deployment. Default to deploying on this VPS (the machine you are running on) unless the project clearly requires something else (mobile stores, CDN, serverless, distributed systems, edge computing, etc). Only then ask.
+- For web projects, the app will be deployed to {project_name}.justralph.it automatically after Ralph builds it. Mention this to the user when discussing web projects.
 Again, spread these across multiple exchanges. Each answer should prompt follow-up questions.
 
 ### Phase 3 — Issue Creation

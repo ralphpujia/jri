@@ -181,6 +181,10 @@ class RalphLoop:
                 if not issues:
                     self.status = "stopped"
                     await self._update_db_status("idle")
+
+                    # --- Deploy if configured ---
+                    await self._deploy_if_configured()
+
                     await sse_bus.publish(
                         self.project_name, "ralph_status",
                         {"status": "idle", "message": "No more ready issues"},
@@ -278,6 +282,63 @@ class RalphLoop:
             if self.status != "stopped":
                 self.status = "stopped"
                 await self._update_db_status("idle")
+
+    async def _deploy_if_configured(self) -> None:
+        """Deploy the project if deploy_type is configured in the DB."""
+        try:
+            async with get_db() as db:
+                cursor = await db.execute(
+                    "SELECT deploy_type, deploy_port, deploy_start_command, deploy_subdomain "
+                    "FROM projects WHERE id = ?",
+                    (self.project_id,),
+                )
+                row = await cursor.fetchone()
+
+            if not row:
+                return
+
+            row_dict = dict(row)
+            deploy_type = row_dict.get("deploy_type")
+            if not deploy_type:
+                return
+
+            deploy_port = row_dict.get("deploy_port")
+            deploy_start_command = row_dict.get("deploy_start_command")
+            deploy_subdomain = row_dict.get("deploy_subdomain") or self.project_name.lower()
+
+            if deploy_type == "dynamic":
+                from app.deploy_manager import deploy_dynamic
+                await deploy_dynamic(
+                    self.project_name, self.project_dir,
+                    deploy_start_command or "", deploy_port or 9000,
+                )
+            elif deploy_type == "static":
+                from app.deploy_manager import deploy_static
+                await deploy_static(self.project_name, self.project_dir)
+
+            # Update deploy_status in DB
+            async with get_db() as db:
+                await db.execute(
+                    "UPDATE projects SET deploy_status = 'running' WHERE id = ?",
+                    (self.project_id,),
+                )
+                await db.commit()
+
+            # Publish deployed SSE event
+            await sse_bus.publish(
+                self.project_name, "ralph_status",
+                {
+                    "status": "deployed",
+                    "url": f"https://{deploy_subdomain}.justralph.it",
+                },
+            )
+            logger.info(
+                "Deployed project %s to https://%s.justralph.it",
+                self.project_name, deploy_subdomain,
+            )
+
+        except Exception:
+            logger.exception("Deployment failed for project %s", self.project_name)
 
     async def _recover(self, issue_id: str) -> None:
         """Reset git state, reopen issue, log crash, and publish event."""

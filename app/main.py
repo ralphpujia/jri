@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from app.config import DATA_DIR
@@ -71,3 +71,12 @@ app.include_router(chat.router)
 app.include_router(ralph.router)
 app.include_router(uploads.router)
 app.include_router(sse.router)
+
+
+@app.middleware("http")
+async def subdomain_middleware(request: Request, call_next):
+    subdomain = request.headers.get("x-subdomain")
+    if subdomain:
+        from app.routers.deploy_proxy import handle_subdomain_request
+        return await handle_subdomain_request(request, subdomain)
+    return await call_next(request)

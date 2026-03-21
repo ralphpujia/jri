@@ -1534,6 +1534,10 @@
                 if (data.status === 'running') {
                     showRalphTab();
                     refreshProject();
+                } else if (data.status === 'deployed') {
+                    var deployUrl = data.url || '';
+                    showToast('Your project is live at ' + deployUrl, 15000);
+                    refreshProject();
                 } else if (data.status === 'loop_done') {
                     showToast('Your project is ready!', 10000);
                     refreshProject();
