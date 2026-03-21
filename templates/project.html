@@ -157,6 +157,25 @@
         color: #6ca6e8;
         text-decoration: underline;
     }
+    .chat-msg table {
+        border-collapse: collapse;
+        margin: 0.4rem 0;
+        font-size: 0.85rem;
+        width: 100%;
+    }
+    .chat-msg th, .chat-msg td {
+        border: 1px solid var(--border-light);
+        padding: 0.3rem 0.6rem;
+        text-align: left;
+    }
+    .chat-msg th {
+        background: var(--card-bg);
+        font-weight: 600;
+        color: var(--text-bright);
+    }
+    .chat-msg tr:nth-child(even) td {
+        background: var(--bg-secondary);
+    }
     .chat-msg p { margin: 0.3rem 0; }
     .chat-msg ul, .chat-msg ol {
         margin: 0.3rem 0;
@@ -787,6 +806,30 @@
         s = s.replace(/((?:<oli>.*<\/oli>\n?)+)/g, '<ol>$1</ol>');
         s = s.replace(/<\/?oli>/g, function(m) { return m.replace('oli', 'li'); });
 
+        // Tables
+        s = s.replace(/^(\|.+\|)\n\|[\s:|-]+\|\n((?:\|.+\|\n?)*)/gm, function(match, headerRow, bodyRows) {
+            var headers = headerRow.split('|').filter(function(c) { return c.trim(); });
+            var rows = bodyRows.trim().split('\n').filter(function(r) { return r.trim(); });
+
+            var html = '<table><thead><tr>';
+            headers.forEach(function(h) {
+                html += '<th>' + h.trim() + '</th>';
+            });
+            html += '</tr></thead><tbody>';
+
+            rows.forEach(function(row) {
+                var cells = row.split('|').filter(function(c) { return c.trim(); });
+                html += '<tr>';
+                cells.forEach(function(c) {
+                    html += '<td>' + c.trim() + '</td>';
+                });
+                html += '</tr>';
+            });
+
+            html += '</tbody></table>';
+            return html;
+        });
+
         // Paragraphs: split by double newlines
         s = s.replace(/\n{2,}/g, '</p><p>');
         s = '<p>' + s + '</p>';
@@ -812,6 +855,8 @@
         s = s.replace(/(<\/ul>)\s*<\/p>/g, '$1');
         s = s.replace(/<p>\s*(<ol>)/g, '$1');
         s = s.replace(/(<\/ol>)\s*<\/p>/g, '$1');
+        s = s.replace(/<p>\s*(<table>)/g, '$1');
+        s = s.replace(/(<\/table>)\s*<\/p>/g, '$1');
 
         return s;
     }
@@ -981,6 +1026,8 @@
                 var buffer = '';
                 var msgDiv = null;
                 var fullText = '';
+                var interleaveText = '';
+                var hasToolUse = false;
                 var thinkingSteps = [];
                 var thinkingText = '';
                 var hasContent = false;
@@ -1000,6 +1047,9 @@
                             thinkingSteps.forEach(function(s) {
                                 html += '<div>Tool: ' + escapeHtml(s) + '</div>';
                             });
+                        }
+                        if (interleaveText) {
+                            html += '<div class="thinking-interleave">' + escapeHtml(interleaveText) + '</div>';
                         }
                         html += '</div></details>';
                     }
@@ -1047,6 +1097,7 @@
                                 rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'tool_use') {
+                                hasToolUse = true;
                                 var label = evt.name || 'Working...';
                                 thinkingSteps.push(label);
                                 // Refresh issues when Ralphy uses Bash (likely bd commands)
@@ -1055,7 +1106,11 @@
                                 rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'text') {
-                                fullText += evt.content;
+                                if (hasToolUse) {
+                                    interleaveText += evt.content;
+                                } else {
+                                    fullText += evt.content;
+                                }
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
