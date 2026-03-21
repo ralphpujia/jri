@@ -4,7 +4,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from app.config import SECRET_KEY
 from app.database import get_db
 
-_SESSION_MAX_AGE = 30 * 24 * 60 * 60  # 30 days in seconds
+SESSION_MAX_AGE = 30 * 24 * 60 * 60  # 30 days in seconds
 _serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 
@@ -15,7 +15,7 @@ def create_session_token(user_id: int) -> str:
 
 def decode_session_token(token: str) -> int:
     """Decode and verify a session token. Returns user id."""
-    return _serializer.loads(token, max_age=_SESSION_MAX_AGE)
+    return _serializer.loads(token, max_age=SESSION_MAX_AGE)
 
 
 async def get_current_user(request: Request) -> dict:
