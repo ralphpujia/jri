@@ -6,7 +6,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import DATA_DIR
 from app.database import init_db
-from app.routers import auth, projects, chat, ralph, uploads, sse
+from app.routers import auth, pages, projects, chat, ralph, uploads, sse
 
 
 @asynccontextmanager
@@ -24,6 +24,7 @@ _static_dir = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # Include routers
+app.include_router(pages.router)
 app.include_router(auth.router)
 app.include_router(projects.router)
 app.include_router(chat.router)
