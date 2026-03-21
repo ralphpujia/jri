@@ -31,7 +31,7 @@ async def _ensure_shared_dolt_server() -> None:
 
     logger.info("Starting shared Dolt server...")
     proc = await asyncio.create_subprocess_exec(
-        "bd", "dolt", "start", "--shared",
+        "bd", "dolt", "start",
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
