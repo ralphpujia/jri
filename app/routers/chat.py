@@ -186,13 +186,13 @@ async def _stream_claude(
                         event = {"type": "thinking", "content": block["thinking"]}
                         yield f"data: {json.dumps(event)}\n\n"
                     elif block.get("type") == "tool_use":
-                        event = {"type": "tool_use", "name": block["name"]}
+                        event = {"type": "tool_use", "name": block["name"], "input": block.get("input", {})}
                         yield f"data: {json.dumps(event)}\n\n"
 
             elif msg_type == "content_block_start":
                 content_block = data.get("content_block", {})
                 if content_block.get("type") == "tool_use":
-                    event = {"type": "tool_use", "name": content_block["name"]}
+                    event = {"type": "tool_use", "name": content_block["name"], "input": content_block.get("input", {})}
                     yield f"data: {json.dumps(event)}\n\n"
 
             elif msg_type == "content_block_delta":

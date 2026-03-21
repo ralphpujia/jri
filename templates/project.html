@@ -158,6 +158,13 @@
         text-decoration: underline;
     }
     .chat-msg p { margin: 0.3rem 0; }
+    .chat-msg ul, .chat-msg ol {
+        margin: 0.3rem 0;
+        padding-left: 1.4rem;
+    }
+    .chat-msg li {
+        margin: 0.15rem 0;
+    }
     .chat-msg strong { color: var(--text-bright); }
     /* ── Thinking/tool-use collapsible ── */
     .chat-msg .thinking {
@@ -191,6 +198,35 @@
         display: none;
     }
     .thinking-indicator.visible { display: block; }
+
+    /* ── AskUserQuestion options ── */
+    .ask-question {
+        margin-top: 0.5rem;
+    }
+    .ask-question-text {
+        margin: 0 0 0.4rem 0;
+        font-weight: 600;
+        color: var(--text);
+    }
+    .ask-question-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .ask-option-btn {
+        padding: 0.35rem 0.8rem;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--card-bg);
+        color: var(--text-muted);
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: border-color 0.15s, color 0.15s;
+    }
+    .ask-option-btn:hover {
+        border-color: #e8a820;
+        color: var(--text-bright);
+    }
 
     /* ── Chat input ── */
     .chat-controls {
@@ -281,6 +317,11 @@
     .btn-attach:hover, .btn-send:hover {
         background: var(--hover-bg);
         color: var(--text-bright);
+    }
+    .btn-send:focus-visible {
+        background: var(--hover-bg);
+        color: var(--text-bright);
+        outline: none;
     }
     .btn-send:disabled, .btn-attach:disabled {
         opacity: 0.4;
@@ -821,8 +862,8 @@
     var tabPressed = false;
     var tabTimer = null;
     chatInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Tab') {
-            e.preventDefault();
+        if (e.key === 'Tab' && !e.shiftKey) {
+            // Let browser move focus to Send button naturally (no preventDefault)
             tabPressed = true;
             clearTimeout(tabTimer);
             tabTimer = setTimeout(function() { tabPressed = false; }, 500);
@@ -951,6 +992,7 @@
                 var fullText = '';
                 var thinkingSteps = [];
                 var thinkingText = '';
+                var pendingQuestion = null;
 
                 function rebuildMsg() {
                     if (!msgDiv) return;
@@ -971,7 +1013,34 @@
                     if (fullText) {
                         html += '<div class="message-text">' + renderMarkdown(fullText) + '</div>';
                     }
+                    if (pendingQuestion) {
+                        html += '<div class="ask-question">';
+                        if (pendingQuestion.question) {
+                            html += '<p class="ask-question-text">' + escapeHtml(pendingQuestion.question) + '</p>';
+                        }
+                        var options = pendingQuestion.options || [];
+                        if (options.length > 0) {
+                            html += '<div class="ask-question-options">';
+                            options.forEach(function(opt, i) {
+                                html += '<button class="ask-option-btn" data-option="' + escapeHtml(String(opt)) + '">' + escapeHtml(String(opt)) + '</button>';
+                            });
+                            html += '</div>';
+                        }
+                        html += '</div>';
+                    }
                     msgDiv.innerHTML = html;
+                    // Bind click handlers for option buttons
+                    if (pendingQuestion) {
+                        var btns = msgDiv.querySelectorAll('.ask-option-btn');
+                        btns.forEach(function(btn) {
+                            btn.addEventListener('click', function() {
+                                var answer = btn.getAttribute('data-option');
+                                pendingQuestion = null;
+                                rebuildMsg();
+                                sendProgrammatic(answer);
+                            });
+                        });
+                    }
                 }
 
                 function ensureMsgDiv() {
@@ -1007,8 +1076,12 @@
                                 rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'tool_use') {
-                                var label = evt.name || 'Working...';
-                                thinkingSteps.push(label);
+                                if (evt.name === 'AskUserQuestion' && evt.input) {
+                                    pendingQuestion = evt.input;
+                                } else {
+                                    var label = evt.name || 'Working...';
+                                    thinkingSteps.push(label);
+                                }
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
