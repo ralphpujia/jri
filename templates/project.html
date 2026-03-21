@@ -809,11 +809,70 @@
         this.style.height = Math.min(this.scrollHeight, 200) + 'px';
     });
 
-    // Enter sends, Shift+Enter newline
+    // Tab+Enter sends, regular Enter for newline / auto-continue lists
+    var tabPressed = false;
+    var tabTimer = null;
     chatInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Tab') {
             e.preventDefault();
-            sendMessage();
+            tabPressed = true;
+            clearTimeout(tabTimer);
+            tabTimer = setTimeout(function() { tabPressed = false; }, 500);
+            return;
+        }
+        if (e.key === 'Enter') {
+            if (tabPressed) {
+                e.preventDefault();
+                tabPressed = false;
+                clearTimeout(tabTimer);
+                sendMessage();
+                return;
+            }
+            // Auto-continue markdown lists
+            var val = this.value;
+            var start = this.selectionStart;
+            var before = val.substring(0, start);
+            var after = val.substring(this.selectionEnd);
+            // Find the current line
+            var lastNewline = before.lastIndexOf('\n');
+            var currentLine = before.substring(lastNewline + 1);
+            // Check for unordered list
+            var unorderedMatch = currentLine.match(/^(\s*)([-*])\s/);
+            if (unorderedMatch) {
+                // If line is just the bullet (empty item), remove it
+                if (currentLine.match(/^\s*[-*]\s*$/)) {
+                    e.preventDefault();
+                    this.value = before.substring(0, lastNewline + 1) + after;
+                    this.selectionStart = this.selectionEnd = lastNewline + 1;
+                    this.dispatchEvent(new Event('input'));
+                    return;
+                }
+                e.preventDefault();
+                var insert = '\n' + unorderedMatch[1] + unorderedMatch[2] + ' ';
+                this.value = before + insert + after;
+                this.selectionStart = this.selectionEnd = start + insert.length;
+                this.dispatchEvent(new Event('input'));
+                return;
+            }
+            // Check for ordered list
+            var orderedMatch = currentLine.match(/^(\s*)(\d+)\.\s/);
+            if (orderedMatch) {
+                // If line is just the number (empty item), remove it
+                if (currentLine.match(/^\s*\d+\.\s*$/)) {
+                    e.preventDefault();
+                    this.value = before.substring(0, lastNewline + 1) + after;
+                    this.selectionStart = this.selectionEnd = lastNewline + 1;
+                    this.dispatchEvent(new Event('input'));
+                    return;
+                }
+                e.preventDefault();
+                var nextNum = parseInt(orderedMatch[2]) + 1;
+                var insert = '\n' + orderedMatch[1] + nextNum + '. ';
+                this.value = before + insert + after;
+                this.selectionStart = this.selectionEnd = start + insert.length;
+                this.dispatchEvent(new Event('input'));
+                return;
+            }
         }
     });
 
