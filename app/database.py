@@ -73,4 +73,21 @@ async def init_db() -> None:
             """
         )
 
+        # Migrate: add deployment columns to projects if they don't exist.
+        # SQLite doesn't support IF NOT EXISTS for ALTER TABLE, so catch errors.
+        _deploy_columns = [
+            ("deploy_type", "TEXT DEFAULT NULL"),
+            ("deploy_port", "INTEGER DEFAULT NULL"),
+            ("deploy_status", "TEXT DEFAULT 'idle'"),
+            ("deploy_start_command", "TEXT DEFAULT NULL"),
+            ("deploy_subdomain", "TEXT DEFAULT NULL"),
+        ]
+        for col_name, col_def in _deploy_columns:
+            try:
+                await db.execute(
+                    f"ALTER TABLE projects ADD COLUMN {col_name} {col_def}"
+                )
+            except Exception:
+                pass  # column already exists
+
         await db.commit()

@@ -369,8 +369,14 @@ async def create_project(
             "INSERT INTO projects (user_id, name, description, github_repo_url) VALUES (?, ?, ?, ?)",
             (user_id, name, description, github_repo_url),
         )
-        await db.commit()
         project_id = cursor.lastrowid
+        deploy_port = 9000 + project_id
+        deploy_subdomain = name.lower()
+        await db.execute(
+            "UPDATE projects SET deploy_port = ?, deploy_subdomain = ? WHERE id = ?",
+            (deploy_port, deploy_subdomain, project_id),
+        )
+        await db.commit()
 
     # 13. Return JSON
     return {
@@ -378,6 +384,8 @@ async def create_project(
         "name": name,
         "description": description,
         "github_repo_url": github_repo_url,
+        "deploy_port": deploy_port,
+        "deploy_subdomain": deploy_subdomain,
     }
 
 
@@ -457,7 +465,8 @@ async def get_project(name: str, user: dict = Depends(get_current_user)):
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT id, name, description, github_repo_url, ralph_session_id, "
-            "ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration, created_at "
+            "ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration, "
+            "deploy_type, deploy_port, deploy_status, deploy_subdomain, created_at "
             "FROM projects WHERE user_id = ? AND name = ?",
             (user_id, name),
         )
@@ -480,8 +489,82 @@ async def get_project(name: str, user: dict = Depends(get_current_user)):
         "ralph_loop_status": row_dict["ralph_loop_status"],
         "ralph_loop_current_issue": row_dict["ralph_loop_current_issue"],
         "ralph_loop_iteration": row_dict["ralph_loop_iteration"],
+        "deploy_type": row_dict["deploy_type"],
+        "deploy_port": row_dict["deploy_port"],
+        "deploy_status": row_dict["deploy_status"],
+        "deploy_subdomain": row_dict["deploy_subdomain"],
         "created_at": row_dict["created_at"],
     }
+
+
+class DeployRequest(BaseModel):
+    type: str  # 'static' or 'dynamic'
+    start_command: str | None = None
+
+
+@router.post("/{name}/deploy")
+async def deploy_project(
+    name: str,
+    body: DeployRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Configure deployment for a project."""
+    if body.type not in ("static", "dynamic"):
+        raise HTTPException(status_code=400, detail="type must be 'static' or 'dynamic'")
+
+    user_id: int = user["id"]
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, deploy_port, deploy_subdomain FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        row_dict = dict(row)
+        project_id = row_dict["id"]
+        deploy_port = row_dict["deploy_port"] or (9000 + project_id)
+        deploy_subdomain = row_dict["deploy_subdomain"] or name.lower()
+
+        await db.execute(
+            "UPDATE projects SET deploy_type = ?, deploy_start_command = ?, "
+            "deploy_status = 'running', deploy_port = ?, deploy_subdomain = ? WHERE id = ?",
+            (body.type, body.start_command, deploy_port, deploy_subdomain, project_id),
+        )
+        await db.commit()
+
+    return {
+        "subdomain_url": f"https://{deploy_subdomain}.justralph.it",
+        "port": deploy_port,
+    }
+
+
+@router.post("/{name}/deploy/stop")
+async def stop_deploy(
+    name: str,
+    user: dict = Depends(get_current_user),
+):
+    """Stop deployment for a project."""
+    user_id: int = user["id"]
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        row = await cursor.fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Project not found")
+
+        await db.execute(
+            "UPDATE projects SET deploy_status = 'stopped' WHERE id = ?",
+            (dict(row)["id"],),
+        )
+        await db.commit()
+
+    return {"deploy_status": "stopped"}
 
 
 @router.delete("/{name}", status_code=204)
