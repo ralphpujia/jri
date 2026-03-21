@@ -2,14 +2,24 @@
 
 import asyncio
 import json
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+import stripe
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.auth_utils import get_current_user
-from app.config import DATA_DIR
+from app.config import DATA_DIR, STRIPE_SECRET_KEY
 from app.database import get_db
 from app.ralph_loop import RalphLoop
+
+logger = logging.getLogger(__name__)
+
+stripe.api_key = STRIPE_SECRET_KEY
+if STRIPE_SECRET_KEY.startswith("pk_"):
+    logger.warning(
+        "STRIPE_SECRET_KEY starts with 'pk_' — this looks like a publishable key, not a secret key"
+    )
 
 router = APIRouter(prefix="/api/projects", tags=["ralph"])
 
@@ -21,7 +31,7 @@ async def _get_project(name: str, user: dict) -> dict:
     """Look up project by name for the authenticated user. Returns row dict."""
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT id, name, ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration "
+            "SELECT id, name, ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration, stripe_payment_id "
             "FROM projects WHERE user_id = ? AND name = ?",
             (user["id"], name),
         )
@@ -106,6 +116,40 @@ async def ralph_stream(name: str):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.get("/{name}/notifications")
+async def get_notifications(name: str, user: dict = Depends(get_current_user)):
+    """Return unacknowledged notifications for a project."""
+    project = await _get_project(name, user)
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, message, beads_issue_id, created_at "
+            "FROM notifications "
+            "WHERE project_id = ? AND acknowledged = 0 "
+            "ORDER BY created_at DESC",
+            (project["id"],),
+        )
+        rows = await cursor.fetchall()
+    return [dict(r) for r in rows]
+
+
+@router.post("/{name}/notifications/{notification_id}/acknowledge")
+async def acknowledge_notification(
+    name: str, notification_id: int, user: dict = Depends(get_current_user)
+):
+    """Mark a notification as acknowledged."""
+    project = await _get_project(name, user)
+    async with get_db() as db:
+        cursor = await db.execute(
+            "UPDATE notifications SET acknowledged = 1 "
+            "WHERE id = ? AND project_id = ?",
+            (notification_id, project["id"]),
+        )
+        await db.commit()
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Notification not found")
+    return {"status": "acknowledged"}
 
 
 @router.get("/{name}/ralph/status")

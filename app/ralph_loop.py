@@ -85,10 +85,82 @@ class RalphLoop:
         await self._update_db_status("running")
         self._task = asyncio.create_task(self._loop())
 
+    async def _poll_for_human_blockers(self) -> None:
+        """Check for issues assigned to Human and create notifications."""
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                "bd", "list", "--json",
+                cwd=self.project_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout_bytes, _ = await proc.communicate()
+
+            try:
+                all_issues = json.loads(stdout_bytes.decode())
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return
+
+            human_issues = [
+                i for i in all_issues
+                if i.get("assignee") == "Human" and i.get("status") == "open"
+            ]
+
+            if not human_issues:
+                return
+
+            async with get_db() as db:
+                for issue in human_issues:
+                    issue_id = issue.get("id", "")
+                    title = issue.get("title", "")
+
+                    # Check if notification already exists for this issue
+                    cursor = await db.execute(
+                        "SELECT id FROM notifications "
+                        "WHERE project_id = ? AND beads_issue_id = ?",
+                        (self.project_id, issue_id),
+                    )
+                    existing = await cursor.fetchone()
+                    if existing:
+                        continue
+
+                    message = f"Ralph needs help: {title}"
+                    cursor = await db.execute(
+                        "INSERT INTO notifications (project_id, message, beads_issue_id) "
+                        "VALUES (?, ?, ?)",
+                        (self.project_id, message, issue_id),
+                    )
+                    notification_id = cursor.lastrowid
+                    await db.commit()
+
+                    # Get created_at for the SSE event
+                    cursor = await db.execute(
+                        "SELECT created_at FROM notifications WHERE id = ?",
+                        (notification_id,),
+                    )
+                    row = await cursor.fetchone()
+                    created_at = row["created_at"] if row else ""
+
+                    await sse_bus.publish(
+                        self.project_name, "notification",
+                        {
+                            "id": notification_id,
+                            "message": message,
+                            "beads_issue_id": issue_id,
+                            "created_at": created_at,
+                        },
+                    )
+
+        except Exception:
+            logger.exception("Error polling for human blockers in project %s", self.project_name)
+
     async def _loop(self) -> None:
         """Core Ralph loop: pick issue, solve, push, repeat."""
         try:
             while self.status == "running":
+                # --- Poll for human-assigned blockers ---
+                await self._poll_for_human_blockers()
+
                 # --- Get ready issues ---
                 proc = await asyncio.create_subprocess_exec(
                     "bd", "ready", "-n", "1", "--json",
