@@ -33,3 +33,10 @@ async def landing(request: Request):
     if await _is_logged_in(request):
         return RedirectResponse(url="/dashboard", status_code=302)
     return templates.TemplateResponse("landing.html", {"request": request})
+
+
+@router.get("/new")
+async def new_project(request: Request):
+    if not await _is_logged_in(request):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse("new_project.html", {"request": request})
