@@ -1,0 +1,1411 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project.name }} — Just Ralph It{% endblock %}
+
+{% block head %}
+<style>
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
+    /* ── Notification banner ── */
+    .notification-banner {
+        display: none;
+        background: #e8a820;
+        color: #1a1a1a;
+        padding: 0.5rem 1.5rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+    }
+    .notification-banner.visible { display: flex; }
+    .notification-banner button {
+        background: #1a1a1a;
+        color: #e8a820;
+        border: none;
+        padding: 0.3rem 0.8rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    /* ── Header ── */
+    .project-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.7rem 1.5rem;
+        border-bottom: 1px solid #222;
+        min-height: 48px;
+    }
+    .header-left a {
+        color: #e0e0e0;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.05rem;
+    }
+    .header-left a:hover { color: #fff; }
+    .header-center {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .header-center .project-name {
+        color: #fff;
+        font-weight: 600;
+        font-size: 1.05rem;
+    }
+    .header-center a.gh-link {
+        color: #888;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+    .header-center a.gh-link:hover { color: #ccc; }
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+    }
+    .header-right img {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+    }
+    .header-right .username {
+        color: #ccc;
+        font-size: 0.9rem;
+    }
+    .header-right a {
+        color: #999;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+    .header-right a:hover { color: #fff; }
+
+    /* ── Main layout ── */
+    .main-layout {
+        display: grid;
+        grid-template-columns: 40% 1px 1fr;
+        height: calc(100vh - 48px);
+        overflow: hidden;
+    }
+    .main-layout.has-banner {
+        height: calc(100vh - 48px - 38px);
+    }
+    .divider {
+        background: #222;
+    }
+
+    /* ── Left panel: Chat ── */
+    .chat-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .chat-msg {
+        max-width: 85%;
+        padding: 0.6rem 0.9rem;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .chat-msg.user {
+        align-self: flex-end;
+        background: #1a1a1a;
+        border: 1px solid #333;
+    }
+    .chat-msg.assistant {
+        align-self: flex-start;
+        background: #111;
+        border: 1px solid #222;
+    }
+    .chat-msg pre {
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 0.5rem;
+        overflow-x: auto;
+        margin: 0.4rem 0;
+    }
+    .chat-msg code {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.85em;
+    }
+    .chat-msg p code {
+        background: #0a0a0a;
+        padding: 0.15rem 0.35rem;
+        border-radius: 3px;
+    }
+    .chat-msg a {
+        color: #6ca6e8;
+        text-decoration: underline;
+    }
+    .chat-msg p { margin: 0.3rem 0; }
+    .chat-msg strong { color: #fff; }
+    .thinking-indicator {
+        align-self: flex-start;
+        color: #888;
+        font-style: italic;
+        font-size: 0.85rem;
+        padding: 0.4rem 0;
+        display: none;
+    }
+    .thinking-indicator.visible { display: block; }
+
+    /* ── Chat input ── */
+    .chat-controls {
+        border-top: 1px solid #222;
+        padding: 0.6rem 1rem;
+    }
+    .jri-btn-area {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 0.5rem;
+    }
+    .btn-jri, .btn-stop, .btn-resume {
+        padding: 0.5rem 1.2rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .btn-jri {
+        background: #e8a820;
+        color: #1a1a1a;
+    }
+    .btn-jri:hover { opacity: 0.85; }
+    .btn-stop {
+        background: #ff4444;
+        color: #fff;
+    }
+    .btn-stop:hover { opacity: 0.85; }
+    .btn-resume {
+        background: #4caf50;
+        color: #fff;
+        margin-left: 0.5rem;
+    }
+    .btn-resume:hover { opacity: 0.85; }
+    .chat-input-area {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+    }
+    .chat-input-area textarea {
+        flex: 1;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        border-radius: 6px;
+        color: #e0e0e0;
+        padding: 0.5rem 0.7rem;
+        font-family: inherit;
+        font-size: 0.9rem;
+        resize: none;
+        min-height: 38px;
+        max-height: 200px;
+        line-height: 1.4;
+        outline: none;
+    }
+    .chat-input-area textarea:focus {
+        border-color: #555;
+    }
+    .chat-input-area textarea:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .btn-attach, .btn-send {
+        background: none;
+        border: 1px solid #333;
+        color: #ccc;
+        border-radius: 6px;
+        padding: 0.45rem 0.7rem;
+        cursor: pointer;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    .btn-attach:hover, .btn-send:hover {
+        border-color: #555;
+        color: #fff;
+    }
+    .btn-send:disabled, .btn-attach:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
+    .attachment-names {
+        font-size: 0.8rem;
+        color: #888;
+        padding: 0.2rem 0 0 0;
+    }
+
+    /* ── Right panel ── */
+    .right-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        overflow: hidden;
+    }
+    .tab-bar {
+        display: flex;
+        border-bottom: 1px solid #222;
+        background: #0f0f0f;
+    }
+    .tab-btn {
+        padding: 0.55rem 1.2rem;
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        color: #888;
+        cursor: pointer;
+        font-size: 0.85rem;
+        font-weight: 500;
+        transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn:hover { color: #ccc; }
+    .tab-btn.active {
+        color: #e0e0e0;
+        border-bottom-color: #e8a820;
+    }
+    .tab-content {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+    }
+    .tab-pane {
+        display: none;
+        position: absolute;
+        inset: 0;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+    .tab-pane.active { display: block; }
+
+    /* ── Issues tab ── */
+    .epic-section {
+        margin-bottom: 1.2rem;
+    }
+    .epic-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        padding: 0.4rem 0;
+        border-bottom: 1px solid #1a1a1a;
+        margin-bottom: 0.4rem;
+    }
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+    .status-dot.closed { background: #4caf50; }
+    .status-dot.in_progress { background: #e8a820; }
+    .status-dot.open { background: #888; }
+    .status-dot.deferred { background: #555; opacity: 0.6; }
+    .issue-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.35rem 0.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .issue-row:hover { background: #1a1a1a; }
+    .issue-id {
+        color: #666;
+        font-size: 0.75rem;
+        min-width: 50px;
+    }
+    .issue-title {
+        flex: 1;
+        color: #ccc;
+    }
+    .issue-badge {
+        font-size: 0.7rem;
+        padding: 0.1rem 0.4rem;
+        border-radius: 3px;
+        background: #222;
+        color: #aaa;
+    }
+    .issue-priority {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #ff6b6b;
+    }
+    .issue-detail {
+        display: none;
+        padding: 0.5rem 0.5rem 0.5rem 1.5rem;
+        font-size: 0.82rem;
+        color: #999;
+        line-height: 1.5;
+        border-left: 2px solid #333;
+        margin: 0.2rem 0 0.4rem 0.8rem;
+    }
+    .issue-detail.expanded { display: block; }
+    .issue-detail strong { color: #bbb; }
+
+    /* ── AGENTS.md tab ── */
+    .agents-md-content {
+        line-height: 1.6;
+        font-size: 0.9rem;
+    }
+    .agents-md-content h1, .agents-md-content h2, .agents-md-content h3 {
+        color: #fff;
+        margin: 1rem 0 0.4rem;
+    }
+    .agents-md-content h1 { font-size: 1.3rem; }
+    .agents-md-content h2 { font-size: 1.1rem; }
+    .agents-md-content h3 { font-size: 0.95rem; }
+    .agents-md-content p { margin: 0.3rem 0; }
+    .agents-md-content code {
+        background: #0a0a0a;
+        padding: 0.15rem 0.35rem;
+        border-radius: 3px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.85em;
+    }
+    .agents-md-content pre {
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 0.5rem;
+        overflow-x: auto;
+        margin: 0.4rem 0;
+    }
+    .agents-md-content a { color: #6ca6e8; }
+    .agents-md-content ul, .agents-md-content ol {
+        padding-left: 1.5rem;
+        margin: 0.3rem 0;
+    }
+    .agents-md-placeholder {
+        color: #666;
+        font-style: italic;
+        margin-top: 2rem;
+        text-align: center;
+    }
+
+    /* ── Ralph tab ── */
+    .ralph-terminal {
+        background: #111;
+        font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+        font-size: 0.8rem;
+        line-height: 1.4;
+        padding: 0.8rem;
+        white-space: pre-wrap;
+        word-break: break-all;
+        color: #aaa;
+        height: 100%;
+        overflow-y: auto;
+    }
+    .ralph-working-on {
+        color: #e8a820;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        font-family: inherit;
+        font-size: 0.85rem;
+    }
+    .ralph-done-msg {
+        color: #4caf50;
+        font-weight: 600;
+        margin-top: 0.5rem;
+    }
+
+    /* ── Uploads tab ── */
+    .upload-controls {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 0.8rem;
+    }
+    .btn-upload {
+        padding: 0.4rem 1rem;
+        background: #1a1a1a;
+        border: 1px solid #333;
+        color: #ccc;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .btn-upload:hover { border-color: #555; color: #fff; }
+    .upload-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+    .upload-item {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        padding: 0.4rem 0.6rem;
+        background: #1a1a1a;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    .upload-item .file-name {
+        flex: 1;
+        color: #ccc;
+        cursor: pointer;
+    }
+    .upload-item .file-name:hover { color: #fff; }
+    .upload-item .file-meta {
+        color: #666;
+        font-size: 0.78rem;
+        white-space: nowrap;
+    }
+    .upload-item button {
+        background: none;
+        border: none;
+        color: #ff4444;
+        cursor: pointer;
+        font-size: 0.8rem;
+        padding: 0.2rem 0.4rem;
+    }
+    .upload-item button:hover { color: #ff6666; }
+    .upload-item input.rename-input {
+        background: #111;
+        border: 1px solid #555;
+        color: #e0e0e0;
+        padding: 0.15rem 0.4rem;
+        border-radius: 3px;
+        font-size: 0.85rem;
+        flex: 1;
+    }
+    .drop-zone-overlay {
+        display: none;
+        position: absolute;
+        inset: 0;
+        background: rgba(232, 168, 32, 0.08);
+        border: 2px dashed #e8a820;
+        border-radius: 8px;
+        z-index: 10;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+        color: #e8a820;
+        font-weight: 600;
+        pointer-events: none;
+    }
+    .drop-zone-overlay.visible {
+        display: flex;
+    }
+    .uploads-empty {
+        color: #666;
+        font-style: italic;
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    /* ── Toast ── */
+    .toast {
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        background: #4caf50;
+        color: #fff;
+        padding: 0.8rem 1.2rem;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        z-index: 1000;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity 0.3s, transform 0.3s;
+        pointer-events: none;
+    }
+    .toast.visible {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #555; }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Notification banner -->
+<div id="notification-banner" class="notification-banner">
+    <span id="notification-text"></span>
+    <button id="notification-ack-btn">Acknowledge</button>
+</div>
+
+<!-- Header -->
+<header class="project-header">
+    <div class="header-left">
+        <a href="/dashboard">Just Ralph It</a>
+    </div>
+    <div class="header-center">
+        <span class="project-name">{{ project.name }}</span>
+        {% if project.github_repo_url %}
+        <a href="{{ project.github_repo_url }}" target="_blank" rel="noopener noreferrer" class="gh-link">GitHub</a>
+        {% endif %}
+    </div>
+    <div class="header-right">
+        <img src="{{ user.github_avatar_url }}" alt="Avatar">
+        <span class="username">{{ user.github_username }}</span>
+        <a href="/auth/logout">Logout</a>
+    </div>
+</header>
+
+<!-- Main two-panel layout -->
+<div id="main-layout" class="main-layout">
+
+    <!-- Left panel: Chat -->
+    <div class="chat-panel">
+        <div id="chat-messages" class="chat-messages">
+            <div id="thinking-indicator" class="thinking-indicator">Ralphy is thinking...</div>
+        </div>
+        <div class="chat-controls">
+            <div id="jri-btn-area" class="jri-btn-area" style="display:none;"></div>
+            <div class="chat-input-area">
+                <button id="btn-attach" class="btn-attach" title="Attach files">Attach</button>
+                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged)" rows="1"></textarea>
+                <button id="btn-send" class="btn-send">Send</button>
+            </div>
+            <div id="attachment-names" class="attachment-names"></div>
+            <input type="file" id="file-input" multiple accept="image/*,application/pdf" style="display:none;">
+        </div>
+    </div>
+
+    <!-- Divider -->
+    <div class="divider"></div>
+
+    <!-- Right panel: Tabs -->
+    <div class="right-panel">
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="issues">Issues</button>
+            <button class="tab-btn" data-tab="agents-md">AGENTS.md</button>
+            <button id="tab-btn-ralph" class="tab-btn" data-tab="ralph" style="display:none;">Ralph</button>
+            <button class="tab-btn" data-tab="uploads">Uploads</button>
+        </div>
+        <div class="tab-content">
+            <div id="tab-issues" class="tab-pane active"></div>
+            <div id="tab-agents-md" class="tab-pane">
+                <div class="agents-md-content" id="agents-md-body"></div>
+            </div>
+            <div id="tab-ralph" class="tab-pane">
+                <div id="ralph-working-on" class="ralph-working-on" style="display:none;"></div>
+                <div id="ralph-terminal" class="ralph-terminal"></div>
+            </div>
+            <div id="tab-uploads" class="tab-pane">
+                <div id="drop-zone-overlay" class="drop-zone-overlay">Drop files here to upload</div>
+                <div class="upload-controls">
+                    <button id="btn-upload-file" class="btn-upload">Upload</button>
+                </div>
+                <div id="upload-list" class="upload-list"></div>
+                <input type="file" id="upload-file-input" multiple style="display:none;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" class="toast"></div>
+
+<script>
+(function() {
+    /* ══════════════════════════════════════════════
+       CONSTANTS & STATE
+       ══════════════════════════════════════════════ */
+    var PROJECT_NAME = {{ project.name | tojson }};
+    var API = '/api/projects/' + encodeURIComponent(PROJECT_NAME);
+    var ralphyProcessing = false;
+    var currentNotifications = [];
+    var attachedFiles = [];
+    var issuesData = null;
+    var projectData = null;
+
+    /* ══════════════════════════════════════════════
+       DOM REFERENCES
+       ══════════════════════════════════════════════ */
+    var chatMessages = document.getElementById('chat-messages');
+    var thinkingEl = document.getElementById('thinking-indicator');
+    var chatInput = document.getElementById('chat-input');
+    var btnSend = document.getElementById('btn-send');
+    var btnAttach = document.getElementById('btn-attach');
+    var fileInput = document.getElementById('file-input');
+    var attachmentNames = document.getElementById('attachment-names');
+    var jriBtnArea = document.getElementById('jri-btn-area');
+    var notifBanner = document.getElementById('notification-banner');
+    var notifText = document.getElementById('notification-text');
+    var notifAckBtn = document.getElementById('notification-ack-btn');
+    var mainLayout = document.getElementById('main-layout');
+    var tabBtnRalph = document.getElementById('tab-btn-ralph');
+    var ralphTerminal = document.getElementById('ralph-terminal');
+    var ralphWorkingOn = document.getElementById('ralph-working-on');
+    var agentsMdBody = document.getElementById('agents-md-body');
+    var uploadList = document.getElementById('upload-list');
+    var btnUploadFile = document.getElementById('btn-upload-file');
+    var uploadFileInput = document.getElementById('upload-file-input');
+    var dropOverlay = document.getElementById('drop-zone-overlay');
+    var toastEl = document.getElementById('toast');
+
+    /* ══════════════════════════════════════════════
+       MARKDOWN RENDERER (basic)
+       ══════════════════════════════════════════════ */
+    function renderMarkdown(text) {
+        if (!text) return '';
+        // Escape HTML
+        var s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        // Code blocks: ```...```
+        s = s.replace(/```([a-zA-Z]*)\n?([\s\S]*?)```/g, function(_, lang, code) {
+            return '<pre><code>' + code.trim() + '</code></pre>';
+        });
+
+        // Inline code
+        s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+        // Bold
+        s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+        // Italic
+        s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Links
+        s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        // Headers
+        s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+        // Unordered lists
+        s = s.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+        s = s.replace(/((?:<li>.*<\/li>\n?)+)/g, '<ul>$1</ul>');
+
+        // Paragraphs: split by double newlines
+        s = s.replace(/\n{2,}/g, '</p><p>');
+        s = '<p>' + s + '</p>';
+
+        // Clean up empty paragraphs and nested issues
+        s = s.replace(/<p>\s*<\/p>/g, '');
+        s = s.replace(/<p>\s*(<h[123]>)/g, '$1');
+        s = s.replace(/(<\/h[123]>)\s*<\/p>/g, '$1');
+        s = s.replace(/<p>\s*(<pre>)/g, '$1');
+        s = s.replace(/(<\/pre>)\s*<\/p>/g, '$1');
+        s = s.replace(/<p>\s*(<ul>)/g, '$1');
+        s = s.replace(/(<\/ul>)\s*<\/p>/g, '$1');
+
+        return s;
+    }
+
+    /* ══════════════════════════════════════════════
+       CHAT
+       ══════════════════════════════════════════════ */
+    function addChatMessage(role, html) {
+        var div = document.createElement('div');
+        div.className = 'chat-msg ' + role;
+        div.innerHTML = html;
+        chatMessages.insertBefore(div, thinkingEl);
+        scrollChat();
+        return div;
+    }
+
+    function scrollChat() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function setProcessing(on) {
+        ralphyProcessing = on;
+        chatInput.disabled = on;
+        btnSend.disabled = on;
+        btnAttach.disabled = on;
+        thinkingEl.className = 'thinking-indicator' + (on ? ' visible' : '');
+        if (on) scrollChat();
+    }
+
+    // Auto-resize textarea
+    chatInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+    });
+
+    // Enter sends, Shift+Enter newline
+    chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    btnSend.addEventListener('click', sendMessage);
+
+    // Attachments
+    btnAttach.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', function() {
+        var files = Array.from(fileInput.files || []);
+        if (files.length > 3) {
+            alert('Maximum 3 files allowed.');
+            fileInput.value = '';
+            return;
+        }
+        var tooBig = files.filter(function(f) { return f.size > 3 * 1024 * 1024; });
+        if (tooBig.length > 0) {
+            alert('Each file must be under 3MB.');
+            fileInput.value = '';
+            return;
+        }
+        attachedFiles = files;
+        attachmentNames.textContent = files.map(function(f) { return f.name; }).join(', ');
+    });
+
+    function sendMessage() {
+        var text = chatInput.value.trim();
+        if (!text || ralphyProcessing) return;
+
+        addChatMessage('user', renderMarkdown(text));
+        setProcessing(true);
+
+        var hasAttachments = attachedFiles.length > 0;
+
+        if (hasAttachments) {
+            var fd = new FormData();
+            fd.append('message', text);
+            attachedFiles.forEach(function(f) { fd.append('files', f); });
+
+            attachedFiles = [];
+            attachmentNames.textContent = '';
+            fileInput.value = '';
+
+            fetchChat(fd, false);
+        } else {
+            fetchChat(JSON.stringify({ message: text }), true);
+        }
+
+        chatInput.value = '';
+        chatInput.style.height = 'auto';
+    }
+
+    function fetchChat(body, isJson) {
+        var headers = {};
+        if (isJson) headers['Content-Type'] = 'application/json';
+
+        fetch(API + '/chat', { method: 'POST', headers: headers, body: body })
+            .then(function(resp) {
+                if (!resp.ok) throw new Error('Chat request failed');
+                var reader = resp.body.getReader();
+                var decoder = new TextDecoder();
+                var buffer = '';
+                var msgDiv = null;
+                var fullText = '';
+
+                function pump() {
+                    return reader.read().then(function(result) {
+                        if (result.done) {
+                            setProcessing(false);
+                            checkJriVisibility();
+                            return;
+                        }
+                        buffer += decoder.decode(result.value, { stream: true });
+                        var lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        lines.forEach(function(line) {
+                            if (!line.startsWith('data: ')) return;
+                            var jsonStr = line.slice(6);
+                            try {
+                                var evt = JSON.parse(jsonStr);
+                            } catch(e) { return; }
+
+                            if (evt.type === 'text') {
+                                fullText += evt.content;
+                                if (!msgDiv) {
+                                    msgDiv = addChatMessage('assistant', renderMarkdown(fullText));
+                                } else {
+                                    msgDiv.innerHTML = renderMarkdown(fullText);
+                                }
+                                scrollChat();
+                            } else if (evt.type === 'done') {
+                                if (evt.result && !msgDiv) {
+                                    addChatMessage('assistant', renderMarkdown(evt.result));
+                                } else if (evt.result && msgDiv) {
+                                    msgDiv.innerHTML = renderMarkdown(evt.result);
+                                }
+                            } else if (evt.type === 'error') {
+                                addChatMessage('assistant', '<span style="color:#ff4444;">Error: ' + (evt.message || 'Unknown error') + '</span>');
+                            }
+                        });
+                        return pump();
+                    });
+                }
+
+                return pump();
+            })
+            .catch(function(err) {
+                setProcessing(false);
+                addChatMessage('assistant', '<span style="color:#ff4444;">Failed to send message.</span>');
+            });
+    }
+
+    /* ══════════════════════════════════════════════
+       JRI / STOP / RESUME BUTTONS
+       ══════════════════════════════════════════════ */
+    function checkJriVisibility() {
+        fetchIssues().then(function() {
+            updateJriButtons();
+        });
+    }
+
+    function updateJriButtons() {
+        jriBtnArea.innerHTML = '';
+
+        if (!projectData) return;
+
+        var status = projectData.ralph_loop_status;
+
+        // If Ralph is running or stopping, show Stop (and Resume if stopped)
+        if (status === 'running' || status === 'stopping') {
+            jriBtnArea.style.display = 'flex';
+            var stopBtn = document.createElement('button');
+            stopBtn.className = 'btn-stop';
+            stopBtn.textContent = status === 'stopping' ? 'Stopping...' : 'Stop Ralph';
+            stopBtn.disabled = status === 'stopping';
+            stopBtn.addEventListener('click', function() {
+                stopBtn.textContent = 'Stopping...';
+                stopBtn.disabled = true;
+                fetch(API + '/ralph/stop', { method: 'POST' }).then(function() {
+                    refreshProject();
+                });
+            });
+            jriBtnArea.appendChild(stopBtn);
+            return;
+        }
+
+        if (status === 'stopped') {
+            jriBtnArea.style.display = 'flex';
+            var resumeBtn = document.createElement('button');
+            resumeBtn.className = 'btn-resume';
+            resumeBtn.textContent = 'Resume Ralph';
+            resumeBtn.addEventListener('click', function() {
+                fetch(API + '/ralph/start', { method: 'POST' }).then(function() {
+                    refreshProject();
+                });
+            });
+            jriBtnArea.appendChild(resumeBtn);
+            return;
+        }
+
+        // Idle: show JRI button when issues exist with open status, none deferred
+        if (issuesData) {
+            var allIssues = [];
+            (issuesData.epics || []).forEach(function(e) {
+                allIssues = allIssues.concat(e.children || []);
+            });
+            allIssues = allIssues.concat(issuesData.ungrouped || []);
+
+            var hasOpen = allIssues.some(function(i) { return i.status === 'open'; });
+            var hasDeferred = allIssues.some(function(i) { return i.status === 'deferred'; });
+
+            if (hasOpen && !hasDeferred) {
+                jriBtnArea.style.display = 'flex';
+                var jriBtn = document.createElement('button');
+                jriBtn.className = 'btn-jri';
+                jriBtn.textContent = 'Just Ralph It';
+                jriBtn.addEventListener('click', function() {
+                    jriBtn.disabled = true;
+                    jriBtn.textContent = 'Starting...';
+                    fetch(API + '/ralph/checkout', { method: 'POST' })
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.free) {
+                                jriBtnArea.style.display = 'none';
+                                refreshProject();
+                            } else if (data.redirect) {
+                                window.location.href = data.redirect;
+                            }
+                        })
+                        .catch(function() {
+                            jriBtn.disabled = false;
+                            jriBtn.textContent = 'Just Ralph It';
+                        });
+                });
+                jriBtnArea.appendChild(jriBtn);
+                return;
+            }
+        }
+
+        jriBtnArea.style.display = 'none';
+    }
+
+    /* ══════════════════════════════════════════════
+       TABS
+       ══════════════════════════════════════════════ */
+    var tabBtns = document.querySelectorAll('.tab-btn');
+    var tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tab = btn.dataset.tab;
+            tabBtns.forEach(function(b) { b.classList.remove('active'); });
+            tabPanes.forEach(function(p) { p.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('tab-' + tab).classList.add('active');
+
+            // Lazy-load data on tab activation
+            if (tab === 'agents-md') fetchAgentsMd();
+            if (tab === 'uploads') fetchUploads();
+        });
+    });
+
+    function showRalphTab() {
+        tabBtnRalph.style.display = '';
+    }
+
+    function hideRalphTab() {
+        tabBtnRalph.style.display = 'none';
+    }
+
+    /* ══════════════════════════════════════════════
+       ISSUES TAB
+       ══════════════════════════════════════════════ */
+    function fetchIssues() {
+        return fetch(API + '/issues')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                issuesData = data;
+                renderIssues(data);
+            })
+            .catch(function() {});
+    }
+
+    function statusDotHtml(status) {
+        var cls = 'status-dot';
+        if (status === 'closed') cls += ' closed';
+        else if (status === 'in_progress') cls += ' in_progress';
+        else if (status === 'deferred') cls += ' deferred';
+        else cls += ' open';
+        return '<span class="' + cls + '"></span>';
+    }
+
+    function renderIssues(data) {
+        var container = document.getElementById('tab-issues');
+        container.innerHTML = '';
+
+        if ((!data.epics || data.epics.length === 0) && (!data.ungrouped || data.ungrouped.length === 0)) {
+            container.innerHTML = '<p style="color:#666;font-style:italic;text-align:center;margin-top:2rem;">No issues yet. Chat with Ralphy to create your project plan.</p>';
+            return;
+        }
+
+        (data.epics || []).forEach(function(epic) {
+            var section = document.createElement('div');
+            section.className = 'epic-section';
+
+            var header = document.createElement('div');
+            header.className = 'epic-header';
+            header.innerHTML = statusDotHtml(epic.status) + ' ' + escapeHtml(epic.title || epic.id);
+            section.appendChild(header);
+
+            (epic.children || []).forEach(function(issue) {
+                section.appendChild(createIssueRow(issue));
+            });
+
+            container.appendChild(section);
+        });
+
+        if (data.ungrouped && data.ungrouped.length > 0) {
+            var ungroupedSection = document.createElement('div');
+            ungroupedSection.className = 'epic-section';
+
+            data.ungrouped.forEach(function(issue) {
+                ungroupedSection.appendChild(createIssueRow(issue));
+            });
+
+            container.appendChild(ungroupedSection);
+        }
+    }
+
+    function createIssueRow(issue) {
+        var frag = document.createDocumentFragment();
+
+        var row = document.createElement('div');
+        row.className = 'issue-row';
+
+        var dotHtml = statusDotHtml(issue.status);
+        var idHtml = '<span class="issue-id">' + escapeHtml(issue.id || '') + '</span>';
+        var titleHtml = '<span class="issue-title">' + escapeHtml(issue.title || '') + '</span>';
+        var badgeHtml = issue.type ? '<span class="issue-badge">' + escapeHtml(issue.type) + '</span>' : '';
+        var prioHtml = '';
+        if (issue.priority === 'P0' || issue.priority === 'P1') {
+            prioHtml = '<span class="issue-priority">' + issue.priority + '</span>';
+        }
+
+        row.innerHTML = dotHtml + idHtml + titleHtml + badgeHtml + prioHtml;
+
+        var detail = document.createElement('div');
+        detail.className = 'issue-detail';
+        var detailParts = [];
+        if (issue.description) detailParts.push('<strong>Description:</strong> ' + escapeHtml(issue.description));
+        if (issue.acceptance_criteria) detailParts.push('<strong>Acceptance Criteria:</strong> ' + escapeHtml(issue.acceptance_criteria));
+        if (issue.dependencies) detailParts.push('<strong>Dependencies:</strong> ' + escapeHtml(issue.dependencies));
+        if (issue.assignee) detailParts.push('<strong>Assignee:</strong> ' + escapeHtml(issue.assignee));
+        detail.innerHTML = detailParts.join('<br>');
+
+        row.addEventListener('click', function() {
+            detail.classList.toggle('expanded');
+        });
+
+        frag.appendChild(row);
+        frag.appendChild(detail);
+        return frag;
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    /* ══════════════════════════════════════════════
+       AGENTS.MD TAB
+       ══════════════════════════════════════════════ */
+    function fetchAgentsMd() {
+        fetch(API + '/agents-md')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.exists && data.content) {
+                    agentsMdBody.innerHTML = renderMarkdown(data.content);
+                    agentsMdBody.className = 'agents-md-content';
+                } else {
+                    agentsMdBody.innerHTML = '<p class="agents-md-placeholder">AGENTS.md will appear here as Ralphy defines the project structure.</p>';
+                }
+            })
+            .catch(function() {});
+    }
+
+    /* ══════════════════════════════════════════════
+       RALPH TAB
+       ══════════════════════════════════════════════ */
+    function appendRalphLine(line) {
+        ralphTerminal.textContent += line + '\n';
+        ralphTerminal.scrollTop = ralphTerminal.scrollHeight;
+    }
+
+    function setRalphWorkingOn(issueId, title) {
+        if (issueId) {
+            ralphWorkingOn.style.display = 'block';
+            ralphWorkingOn.textContent = 'Working on: ' + issueId + (title ? ' \u2014 ' + title : '');
+        } else {
+            ralphWorkingOn.style.display = 'none';
+        }
+    }
+
+    /* ══════════════════════════════════════════════
+       UPLOADS TAB
+       ══════════════════════════════════════════════ */
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function formatDate(iso) {
+        if (!iso) return '';
+        var d = new Date(iso);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function fetchUploads() {
+        fetch(API + '/uploads')
+            .then(function(r) { return r.json(); })
+            .then(function(files) { renderUploads(files); })
+            .catch(function() {});
+    }
+
+    function renderUploads(files) {
+        uploadList.innerHTML = '';
+        if (!files || files.length === 0) {
+            uploadList.innerHTML = '<p class="uploads-empty">No files uploaded yet.</p>';
+            return;
+        }
+        files.forEach(function(f) {
+            var item = document.createElement('div');
+            item.className = 'upload-item';
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'file-name';
+            nameSpan.textContent = f.name;
+            nameSpan.title = 'Click to rename';
+            nameSpan.addEventListener('click', function() {
+                startRename(item, f.name);
+            });
+
+            var metaSpan = document.createElement('span');
+            metaSpan.className = 'file-meta';
+            metaSpan.textContent = formatSize(f.size) + ' \u00B7 ' + formatDate(f.modified_at);
+
+            var delBtn = document.createElement('button');
+            delBtn.textContent = 'Delete';
+            delBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (!confirm('Delete "' + f.name + '"?')) return;
+                fetch(API + '/uploads/' + encodeURIComponent(f.name), { method: 'DELETE' })
+                    .then(function() { fetchUploads(); });
+            });
+
+            item.appendChild(nameSpan);
+            item.appendChild(metaSpan);
+            item.appendChild(delBtn);
+            uploadList.appendChild(item);
+        });
+    }
+
+    function startRename(item, oldName) {
+        var input = document.createElement('input');
+        input.className = 'rename-input';
+        input.value = oldName;
+        item.innerHTML = '';
+        item.appendChild(input);
+        input.focus();
+        input.select();
+
+        function doRename() {
+            var newName = input.value.trim();
+            if (!newName || newName === oldName) {
+                fetchUploads();
+                return;
+            }
+            fetch(API + '/uploads/' + encodeURIComponent(oldName), {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_name: newName }),
+            }).then(function() { fetchUploads(); });
+        }
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') doRename();
+            if (e.key === 'Escape') fetchUploads();
+        });
+        input.addEventListener('blur', doRename);
+    }
+
+    function uploadFiles(files) {
+        var uploads = Array.from(files);
+        var promises = uploads.map(function(file) {
+            var fd = new FormData();
+            fd.append('file', file);
+            return fetch(API + '/uploads', { method: 'POST', body: fd });
+        });
+        Promise.all(promises).then(function() { fetchUploads(); });
+    }
+
+    btnUploadFile.addEventListener('click', function() { uploadFileInput.click(); });
+    uploadFileInput.addEventListener('change', function() {
+        if (uploadFileInput.files.length > 0) {
+            uploadFiles(uploadFileInput.files);
+            uploadFileInput.value = '';
+        }
+    });
+
+    // Drag and drop on uploads tab
+    var uploadsPane = document.getElementById('tab-uploads');
+    var dragCounter = 0;
+
+    uploadsPane.addEventListener('dragenter', function(e) {
+        e.preventDefault();
+        dragCounter++;
+        dropOverlay.classList.add('visible');
+    });
+    uploadsPane.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        dragCounter--;
+        if (dragCounter <= 0) {
+            dragCounter = 0;
+            dropOverlay.classList.remove('visible');
+        }
+    });
+    uploadsPane.addEventListener('dragover', function(e) {
+        e.preventDefault();
+    });
+    uploadsPane.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dragCounter = 0;
+        dropOverlay.classList.remove('visible');
+        if (e.dataTransfer.files.length > 0) {
+            uploadFiles(e.dataTransfer.files);
+        }
+    });
+
+    /* ══════════════════════════════════════════════
+       NOTIFICATIONS
+       ══════════════════════════════════════════════ */
+    function fetchNotifications() {
+        fetch(API + '/notifications')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                currentNotifications = data || [];
+                renderNotificationBanner();
+            })
+            .catch(function() {});
+    }
+
+    function renderNotificationBanner() {
+        if (currentNotifications.length === 0) {
+            notifBanner.classList.remove('visible');
+            mainLayout.classList.remove('has-banner');
+            return;
+        }
+        var latest = currentNotifications[0];
+        notifText.textContent = latest.message;
+        notifBanner.classList.add('visible');
+        mainLayout.classList.add('has-banner');
+    }
+
+    notifAckBtn.addEventListener('click', function() {
+        if (currentNotifications.length === 0) return;
+        var id = currentNotifications[0].id;
+        fetch(API + '/notifications/' + id + '/acknowledge', { method: 'POST' })
+            .then(function() {
+                currentNotifications.shift();
+                renderNotificationBanner();
+            });
+    });
+
+    /* ══════════════════════════════════════════════
+       TOAST
+       ══════════════════════════════════════════════ */
+    function showToast(msg, duration) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('visible');
+        setTimeout(function() {
+            toastEl.classList.remove('visible');
+        }, duration || 10000);
+    }
+
+    /* ══════════════════════════════════════════════
+       SSE (EventSource for real-time updates)
+       ══════════════════════════════════════════════ */
+    function connectSSE() {
+        var es = new EventSource(API + '/events');
+
+        es.addEventListener('issue_update', function(e) {
+            fetchIssues().then(updateJriButtons);
+        });
+
+        es.addEventListener('agents_md_update', function(e) {
+            fetchAgentsMd();
+        });
+
+        es.addEventListener('ralph_stdout', function(e) {
+            try {
+                var data = JSON.parse(e.data);
+                appendRalphLine(data.line || data.text || '');
+            } catch(err) {}
+        });
+
+        es.addEventListener('ralph_status', function(e) {
+            try {
+                var data = JSON.parse(e.data);
+                if (data.status === 'running') {
+                    showRalphTab();
+                    refreshProject();
+                } else if (data.status === 'loop_done') {
+                    showToast('Your project is ready!', 10000);
+                    refreshProject();
+                } else if (data.status === 'working_on') {
+                    setRalphWorkingOn(data.issue_id, data.title);
+                } else {
+                    refreshProject();
+                }
+            } catch(err) {}
+        });
+
+        es.addEventListener('notification', function(e) {
+            fetchNotifications();
+        });
+
+        es.addEventListener('ralphy_processing', function(e) {
+            try {
+                var data = JSON.parse(e.data);
+                if (data.status === 'start') {
+                    setProcessing(true);
+                } else if (data.status === 'end') {
+                    setProcessing(false);
+                    checkJriVisibility();
+                }
+            } catch(err) {}
+        });
+
+        es.onerror = function() {
+            // EventSource will auto-reconnect
+        };
+    }
+
+    /* ══════════════════════════════════════════════
+       PROJECT DATA
+       ══════════════════════════════════════════════ */
+    function refreshProject() {
+        return fetch(API)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                projectData = data;
+                applyProjectState();
+            })
+            .catch(function() {});
+    }
+
+    function applyProjectState() {
+        if (!projectData) return;
+
+        var status = projectData.ralph_loop_status;
+
+        if (status === 'running' || status === 'stopping' || status === 'stopped') {
+            showRalphTab();
+        } else {
+            hideRalphTab();
+        }
+
+        if (projectData.ralph_loop_current_issue) {
+            setRalphWorkingOn(projectData.ralph_loop_current_issue, '');
+        }
+
+        updateJriButtons();
+    }
+
+    /* ══════════════════════════════════════════════
+       INIT
+       ══════════════════════════════════════════════ */
+    function init() {
+        // 1. Fetch project data
+        refreshProject();
+
+        // 2. Fetch issues
+        fetchIssues();
+
+        // 3. Fetch agents-md
+        fetchAgentsMd();
+
+        // 4. Connect SSE
+        connectSSE();
+
+        // 5. Fetch notifications
+        fetchNotifications();
+    }
+
+    init();
+})();
+</script>
+{% endblock %}
