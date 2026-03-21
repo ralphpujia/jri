@@ -19,6 +19,9 @@ SECRET_KEY: str = os.environ.get("SECRET_KEY", "")
 STRIPE_SECRET_KEY: str = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY: str = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 
+# Base URL (used for OAuth callbacks, Stripe redirects, etc.)
+BASE_URL: str = os.environ.get("BASE_URL", "https://justralph.it")
+
 # Data directory for persistent storage
 DATA_DIR: Path = Path.home() / "jri" / "data"
 

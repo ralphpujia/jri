@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
 from app.auth_utils import get_current_user
-from app.config import DATA_DIR, STRIPE_SECRET_KEY
+from app.config import BASE_URL, DATA_DIR, STRIPE_SECRET_KEY
 from app.database import get_db
 from app.ralph_loop import RalphLoop
 
@@ -97,8 +97,8 @@ async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
                 "quantity": 1,
             }
         ],
-        success_url=f"https://justralph.it/project/{name}?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"https://justralph.it/project/{name}?payment=cancel",
+        success_url=f"{BASE_URL}/project/{name}?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{BASE_URL}/project/{name}?payment=cancel",
         client_reference_id=str(project["id"]),
         metadata={"user_id": str(user["id"]), "project_name": name},
     )

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.auth_utils import create_session_token, get_current_user
-from app.config import GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, SECRET_KEY
+from app.config import BASE_URL, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, SECRET_KEY
 from app.database import get_db
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 _GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize"
 _GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token"
 _GITHUB_USER_URL = "https://api.github.com/user"
-_CALLBACK_URI = "https://justralph.it/auth/callback"
+_CALLBACK_URI = f"{BASE_URL}/auth/callback"
 _SESSION_MAX_AGE = 30 * 24 * 60 * 60  # 30 days
 
 
