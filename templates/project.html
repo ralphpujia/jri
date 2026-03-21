@@ -702,8 +702,11 @@
             </div>
             <div id="tab-env" class="tab-pane">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
-                    <span style="color:var(--text-dim);font-size:0.85rem;">.env variables for this project (gitignored)</span>
-                    <button id="btn-save-env" style="padding:0.4rem 1rem;background:var(--card-bg);border:1px solid var(--border-light);color:var(--text-muted);border-radius:4px;cursor:pointer;font-size:0.85rem;">Save</button>
+                    <span style="color:var(--text-dim);font-size:0.85rem;">Environment variables for this project.</span>
+                    <div style="display:flex;gap:0.4rem;">
+                        <button id="btn-reset-env" style="padding:0.4rem 1rem;background:none;border:1px solid var(--border-light);color:var(--text-dim);border-radius:4px;cursor:pointer;font-size:0.85rem;">Reset</button>
+                        <button id="btn-save-env" style="padding:0.4rem 1rem;background:var(--card-bg);border:1px solid var(--border-light);color:var(--text-muted);border-radius:4px;cursor:pointer;font-size:0.85rem;">Save</button>
+                    </div>
                 </div>
                 <textarea id="env-editor" style="width:100%;min-height:300px;background:var(--bg-secondary);color:var(--text);border:1px solid var(--border-light);border-radius:4px;padding:0.6rem;font-family:'SF Mono','Fira Code',monospace;font-size:0.82rem;resize:vertical;outline:none;line-height:1.5;" placeholder="KEY=value&#10;DATABASE_URL=postgres://..."></textarea>
             </div>
@@ -1564,6 +1567,11 @@
        ══════════════════════════════════════════════ */
     var envEditor = document.getElementById('env-editor');
     var btnSaveEnv = document.getElementById('btn-save-env');
+    var btnResetEnv = document.getElementById('btn-reset-env');
+
+    btnResetEnv.addEventListener('click', function() {
+        fetchEnv();
+    });
 
     function fetchEnv() {
         fetch(API + '/env')
