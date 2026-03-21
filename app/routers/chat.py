@@ -17,7 +17,7 @@ from app.sse_bus import sse_bus
 
 router = APIRouter(prefix="/api/projects", tags=["chat"])
 
-ALLOWED_TOOLS = "Bash(bd:*) Bash(git:*) Read Write Edit Glob Grep"
+ALLOWED_TOOLS = "Bash(bd:*) Bash(git:*) Read Glob Grep Write(AGENTS.md) Edit(AGENTS.md)"
 
 ALLOWED_MIME_TYPES = {
     "image/png",
