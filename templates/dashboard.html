@@ -137,49 +137,11 @@
         margin-bottom: 1.5rem;
         font-size: 1.1rem;
     }
-    /* Shimmer loading skeleton */
-    .shimmer-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border-light);
-        border-radius: 6px;
-        padding: 1.2rem 1.5rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    .shimmer-bar {
-        background: var(--border-light);
-        border-radius: 4px;
-        position: relative;
-        overflow: hidden;
-    }
-    .shimmer-bar::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(90deg, transparent, var(--hover-bg), transparent);
-        animation: shimmer 1.5s infinite;
-    }
-    @keyframes shimmer {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
-    .shimmer-info {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    .shimmer-title {
-        width: 180px;
-        height: 18px;
-    }
-    .shimmer-meta {
-        width: 120px;
-        height: 14px;
-    }
-    .shimmer-action {
-        width: 50px;
-        height: 16px;
+    #loading-text {
+        text-align: center;
+        color: var(--text-dim);
+        padding: 3rem 0;
+        font-size: 1.1rem;
     }
 </style>
 {% endblock %}
@@ -199,9 +161,7 @@
         <a href="/new" class="btn">New Project</a>
     </div>
     <div id="project-list" class="project-list">
-        <div class="shimmer-card"><div class="shimmer-info"><div class="shimmer-bar shimmer-title"></div><div class="shimmer-bar shimmer-meta"></div></div><div class="shimmer-bar shimmer-action"></div></div>
-        <div class="shimmer-card"><div class="shimmer-info"><div class="shimmer-bar shimmer-title"></div><div class="shimmer-bar shimmer-meta"></div></div><div class="shimmer-bar shimmer-action"></div></div>
-        <div class="shimmer-card"><div class="shimmer-info"><div class="shimmer-bar shimmer-title"></div><div class="shimmer-bar shimmer-meta"></div></div><div class="shimmer-bar shimmer-action"></div></div>
+        <div id="loading-text">Loading…</div>
     </div>
     <div id="empty-state" class="empty-state" style="display:none;">
         <p>No projects yet.</p>
@@ -213,6 +173,8 @@
     var emptyEl = document.getElementById('empty-state');
 
     function renderProjects(projects) {
+        var loadingEl = document.getElementById('loading-text');
+        if (loadingEl) loadingEl.style.display = 'none';
         listEl.innerHTML = '';
         if (projects.length === 0) {
             emptyEl.style.display = 'block';
