@@ -32,6 +32,129 @@ async def _run(args: list[str], cwd: str | None = None) -> tuple[int, str, str]:
     return proc.returncode, stdout.decode(), stderr.decode()
 
 
+async def _get_project_dir(name: str, user: dict) -> str:
+    """Verify project belongs to user and return its directory path.
+
+    Raises HTTPException(404) if the project doesn't exist or doesn't
+    belong to the authenticated user.
+    """
+    user_id: int = user["id"]
+    github_username: str = user["github_username"]
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Project not found")
+
+    project_dir = DATA_DIR / github_username / name
+    if not project_dir.is_dir():
+        raise HTTPException(status_code=404, detail="Project directory not found")
+
+    return str(project_dir)
+
+
+@router.get("/{name}/issues")
+async def list_issues(
+    name: str,
+    user: dict = Depends(get_current_user),
+):
+    """List all issues in a project, grouped by parent epic."""
+    cwd = await _get_project_dir(name, user)
+
+    rc, stdout, _ = await _run(["bd", "list", "--json"], cwd=cwd)
+    if rc != 0:
+        return {"epics": [], "ungrouped": []}
+
+    try:
+        issues = json.loads(stdout)
+    except json.JSONDecodeError:
+        return {"epics": [], "ungrouped": []}
+
+    if not issues:
+        return {"epics": [], "ungrouped": []}
+
+    _FIELDS = (
+        "id",
+        "title",
+        "type",
+        "status",
+        "priority",
+        "description",
+        "acceptance_criteria",
+        "assignee",
+        "dependencies",
+        "created_at",
+    )
+
+    def _pick(issue: dict) -> dict:
+        return {k: issue.get(k) for k in _FIELDS}
+
+    epics_map: dict[str, dict] = {}  # epic id -> epic dict with children
+    ungrouped: list[dict] = []
+
+    # First pass: identify epics (type == "epic" or has children via dotted ids)
+    for issue in issues:
+        iid = issue.get("id", "")
+        if issue.get("type") == "epic" or (
+            "." not in iid
+            and any(
+                other.get("id", "").startswith(iid + ".")
+                for other in issues
+                if other.get("id", "") != iid
+            )
+        ):
+            epics_map[iid] = {
+                "id": iid,
+                "title": issue.get("title", ""),
+                "status": issue.get("status", ""),
+                "children": [],
+            }
+
+    # Second pass: assign children to epics
+    for issue in issues:
+        iid = issue.get("id", "")
+        if iid in epics_map:
+            continue
+
+        parent = issue.get("parent", "")
+        if not parent and "." in iid:
+            parent = iid.rsplit(".", 1)[0]
+
+        if parent and parent in epics_map:
+            epics_map[parent]["children"].append(_pick(issue))
+        else:
+            ungrouped.append(_pick(issue))
+
+    return {
+        "epics": list(epics_map.values()),
+        "ungrouped": ungrouped,
+    }
+
+
+@router.get("/{name}/issues/{issue_id}")
+async def get_issue(
+    name: str,
+    issue_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Return full details for a single issue."""
+    cwd = await _get_project_dir(name, user)
+
+    rc, stdout, stderr = await _run(["bd", "show", issue_id, "--json"], cwd=cwd)
+    if rc != 0:
+        raise HTTPException(
+            status_code=404, detail=f"Issue not found: {stderr.strip()}"
+        )
+
+    try:
+        return json.loads(stdout)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Failed to parse issue data")
+
+
 @router.post("")
 async def create_project(
     body: CreateProjectRequest,
@@ -46,7 +169,10 @@ async def create_project(
 
     github_username: str = user["github_username"]
     user_name: str = user.get("github_name") or github_username
-    user_email: str = user.get("github_email") or f"{github_username}@users.noreply.github.com"
+    user_email: str = (
+        user.get("github_email")
+        or f"{github_username}@users.noreply.github.com"
+    )
     user_id: int = user["id"]
 
     # Check uniqueness in DB
@@ -74,7 +200,10 @@ async def create_project(
 
         # 3. git config
         await _run(["git", "config", "user.name", "ralphpujia"], cwd=cwd)
-        await _run(["git", "config", "user.email", "ralphpujia@users.noreply.github.com"], cwd=cwd)
+        await _run(
+            ["git", "config", "user.email", "ralphpujia@users.noreply.github.com"],
+            cwd=cwd,
+        )
 
         # 4. bd init
         rc, _, err = await _run(["bd", "init"], cwd=cwd)
@@ -125,9 +254,13 @@ async def create_project(
                 timeout=30,
             )
             if resp.status_code == 422 and "already exists" in resp.text.lower():
-                raise HTTPException(status_code=409, detail="GitHub repo already exists")
+                raise HTTPException(
+                    status_code=409, detail="GitHub repo already exists"
+                )
             if resp.status_code >= 400:
-                raise RuntimeError(f"GitHub create repo failed ({resp.status_code}): {resp.text}")
+                raise RuntimeError(
+                    f"GitHub create repo failed ({resp.status_code}): {resp.text}"
+                )
 
             # 9. Add user as collaborator
             resp2 = await client.put(
@@ -137,11 +270,19 @@ async def create_project(
                 timeout=30,
             )
             if resp2.status_code >= 400:
-                raise RuntimeError(f"GitHub add collaborator failed ({resp2.status_code}): {resp2.text}")
+                raise RuntimeError(
+                    f"GitHub add collaborator failed ({resp2.status_code}): {resp2.text}"
+                )
 
         # 10. Add remote
         rc, _, err = await _run(
-            ["git", "remote", "add", "origin", f"https://x-access-token:{token}@github.com/ralphpujia/{name}.git"],
+            [
+                "git",
+                "remote",
+                "add",
+                "origin",
+                f"https://x-access-token:{token}@github.com/ralphpujia/{name}.git",
+            ],
             cwd=cwd,
         )
         if rc != 0:
@@ -306,7 +447,9 @@ async def delete_project(
     row_dict = dict(row)
 
     if row_dict["ralph_loop_status"] == "running":
-        raise HTTPException(status_code=409, detail="Cannot delete while Ralph is running")
+        raise HTTPException(
+            status_code=409, detail="Cannot delete while Ralph is running"
+        )
 
     # Delete GitHub repo if requested
     if delete_repo:
