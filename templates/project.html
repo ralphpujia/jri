@@ -235,9 +235,6 @@
         background: var(--input-bg);
         overflow: hidden;
     }
-    .chat-input-area:focus-within {
-        border-color: var(--border-focus);
-    }
     .chat-input-area textarea {
         flex: 1;
         background: transparent;
@@ -252,6 +249,9 @@
         line-height: 1.4;
         outline: none;
         overflow-y: hidden;
+    }
+    .chat-input-area textarea:focus {
+        background: var(--hover-bg);
     }
     .chat-input-area textarea::placeholder {
         font-size: 0.8em;
