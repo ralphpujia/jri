@@ -1,9 +1,10 @@
 import asyncio
+import json
 import re
 import shutil
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from app.auth_utils import get_current_user
@@ -178,3 +179,26 @@ async def create_project(
         "description": description,
         "github_repo_url": github_repo_url,
     }
+
+
+@router.get("/{name}/agents-md")
+async def get_agents_md(name: str, user: dict = Depends(get_current_user)):
+    github_username: str = user["github_username"]
+    user_id: int = user["id"]
+
+    # Verify project belongs to user
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Project not found")
+
+    agents_path = DATA_DIR / github_username / name / "AGENTS.md"
+
+    if not agents_path.exists():
+        return {"content": "", "exists": False}
+
+    content = agents_path.read_text()
+    return {"content": content, "exists": True}
