@@ -181,6 +181,51 @@ async def create_project(
     }
 
 
+async def _get_issue_count(project_dir: str) -> int:
+    """Run `bd list --json` in the project directory and count issues."""
+    try:
+        rc, stdout, _ = await _run(["bd", "list", "--json"], cwd=project_dir)
+        if rc != 0:
+            return 0
+        issues = json.loads(stdout)
+        return len(issues)
+    except Exception:
+        return 0
+
+
+@router.get("")
+async def list_projects(user: dict = Depends(get_current_user)):
+    user_id: int = user["id"]
+    github_username: str = user["github_username"]
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, name, description, github_repo_url, ralph_loop_status, created_at "
+            "FROM projects WHERE user_id = ?",
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+
+    results = []
+    for row in rows:
+        row_dict = dict(row)
+        project_dir = str(DATA_DIR / github_username / row_dict["name"])
+        issue_count = await _get_issue_count(project_dir)
+        results.append(
+            {
+                "id": row_dict["id"],
+                "name": row_dict["name"],
+                "description": row_dict["description"],
+                "github_repo_url": row_dict["github_repo_url"],
+                "issue_count": issue_count,
+                "ralph_loop_status": row_dict["ralph_loop_status"],
+                "created_at": row_dict["created_at"],
+            }
+        )
+
+    return results
+
+
 @router.get("/{name}/agents-md")
 async def get_agents_md(name: str, user: dict = Depends(get_current_user)):
     github_username: str = user["github_username"]
@@ -202,3 +247,95 @@ async def get_agents_md(name: str, user: dict = Depends(get_current_user)):
 
     content = agents_path.read_text()
     return {"content": content, "exists": True}
+
+
+@router.get("/{name}")
+async def get_project(name: str, user: dict = Depends(get_current_user)):
+    user_id: int = user["id"]
+    github_username: str = user["github_username"]
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, name, description, github_repo_url, ralph_session_id, "
+            "ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration, created_at "
+            "FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        row = await cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    row_dict = dict(row)
+    project_dir = str(DATA_DIR / github_username / row_dict["name"])
+    issue_count = await _get_issue_count(project_dir)
+
+    return {
+        "id": row_dict["id"],
+        "name": row_dict["name"],
+        "description": row_dict["description"],
+        "github_repo_url": row_dict["github_repo_url"],
+        "issue_count": issue_count,
+        "ralph_session_id": row_dict["ralph_session_id"],
+        "ralph_loop_status": row_dict["ralph_loop_status"],
+        "ralph_loop_current_issue": row_dict["ralph_loop_current_issue"],
+        "ralph_loop_iteration": row_dict["ralph_loop_iteration"],
+        "created_at": row_dict["created_at"],
+    }
+
+
+@router.delete("/{name}", status_code=204)
+async def delete_project(
+    name: str,
+    delete_repo: bool = True,
+    user: dict = Depends(get_current_user),
+):
+    user_id: int = user["id"]
+    github_username: str = user["github_username"]
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id, ralph_loop_status FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        row = await cursor.fetchone()
+
+    if row is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    row_dict = dict(row)
+
+    if row_dict["ralph_loop_status"] == "running":
+        raise HTTPException(status_code=409, detail="Cannot delete while Ralph is running")
+
+    # Delete GitHub repo if requested
+    if delete_repo:
+        token = RALPH_BOT_GITHUB_TOKEN
+        headers = {
+            "Authorization": f"token {token}",
+            "Accept": "application/vnd.github+json",
+        }
+        async with httpx.AsyncClient() as client:
+            resp = await client.delete(
+                f"https://api.github.com/repos/ralphpujia/{name}",
+                headers=headers,
+                timeout=30,
+            )
+            # Ignore 404 (repo already gone)
+            if resp.status_code >= 400 and resp.status_code != 404:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"GitHub delete repo failed ({resp.status_code}): {resp.text}",
+                )
+
+    # Delete project directory
+    project_dir = DATA_DIR / github_username / name
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
+
+    # Delete from SQLite
+    async with get_db() as db:
+        await db.execute("DELETE FROM projects WHERE id = ?", (row_dict["id"],))
+        await db.commit()
+
+    return Response(status_code=204)
