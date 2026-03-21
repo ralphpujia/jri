@@ -3,9 +3,11 @@
 import asyncio
 import json
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from app.auth_utils import get_current_user
+from app.database import get_db
 from app.sse_bus import sse_bus
 
 router = APIRouter(prefix="/api/projects", tags=["sse"])
@@ -14,14 +16,21 @@ KEEPALIVE_INTERVAL = 30  # seconds
 
 
 @router.get("/{project_name}/events")
-async def project_events(project_name: str):
+async def project_events(project_name: str, user: dict = Depends(get_current_user)):
     """Stream SSE events for a project.
 
     Returns text/event-stream. Sends a keepalive comment every 30 seconds
     and cleans up the subscription when the client disconnects.
-
-    Auth will be added by a later task (get_current_user dependency).
     """
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+            (user["id"], project_name),
+        )
+        row = await cursor.fetchone()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Project not found")
 
     async def _stream():
         queue = sse_bus.subscribe(project_name)
