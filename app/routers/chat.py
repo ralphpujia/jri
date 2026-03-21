@@ -66,7 +66,7 @@ def _build_claude_args(
     session_id: str, is_new_session: bool, user_message: str
 ) -> list[str]:
     """Build the argument list for the claude CLI subprocess."""
-    args = ["claude", "-p", "--model", "opus"]
+    args = ["claude", "-p", "--model", "opus", "--max-budget-usd", "5"]
 
     if is_new_session:
         args += ["--session-id", session_id]
@@ -198,7 +198,17 @@ async def _stream_claude(
         if proc.returncode != 0:
             stderr_bytes = await proc.stderr.read()
             stderr_text = stderr_bytes.decode().strip()
-            event = {"type": "error", "message": f"Claude exited with code {proc.returncode}: {stderr_text}"}
+            context_keywords = ["context", "token", "length", "too long", "max_tokens"]
+            if any(kw in stderr_text.lower() for kw in context_keywords):
+                event = {
+                    "type": "error",
+                    "message": "The conversation is getting too long. Please start a new session.",
+                }
+            else:
+                event = {
+                    "type": "error",
+                    "message": f"Claude exited with code {proc.returncode}: {stderr_text}",
+                }
             yield f"data: {json.dumps(event)}\n\n"
 
     except Exception as exc:

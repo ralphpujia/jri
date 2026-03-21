@@ -253,6 +253,11 @@
         opacity: 0.4;
         cursor: not-allowed;
     }
+    .btn-send:disabled:hover, .btn-attach:disabled:hover {
+        background: none;
+        color: var(--text-muted);
+        cursor: not-allowed;
+    }
     .attachment-names {
         font-size: 0.8rem;
         color: var(--text-dim);
@@ -588,7 +593,7 @@
             <div id="jri-btn-area" class="jri-btn-area" style="display:none;"></div>
             <div class="chat-input-area">
                 <button id="btn-attach" class="btn-attach" title="Attach files">Attach</button>
-                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged)" rows="1"></textarea>
+                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged, Shift+Enter for new line)" rows="1"></textarea>
                 <button id="btn-send" class="btn-send">Send</button>
             </div>
             <div id="attachment-names" class="attachment-names"></div>
@@ -731,6 +736,9 @@
         // Paragraphs: split by double newlines
         s = s.replace(/\n{2,}/g, '</p><p>');
         s = '<p>' + s + '</p>';
+
+        // Single newlines to <br>
+        s = s.replace(/\n/g, '<br>');
 
         // Clean up empty paragraphs and nested issues
         s = s.replace(/<p>\s*<\/p>/g, '');
@@ -880,6 +888,7 @@
                                     msgDiv.innerHTML = renderMarkdown(evt.result);
                                 }
                             } else if (evt.type === 'error') {
+                                setProcessing(false);
                                 addChatMessage('assistant', '<span style="color:#ff4444;">Error: ' + (evt.message || 'Unknown error') + '</span>');
                             }
                         });
