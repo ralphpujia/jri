@@ -41,13 +41,10 @@ async def _get_project(name: str, user: dict) -> dict:
     return dict(row)
 
 
-@router.post("/{name}/ralph/start")
-async def ralph_start(name: str, user: dict = Depends(get_current_user)):
-    """Begin the Ralph loop for a project."""
-    project = await _get_project(name, user)
-
+async def _start_ralph_loop(name: str, project: dict, user: dict) -> None:
+    """Shared helper to start the Ralph loop for a project."""
     if name in _loops and _loops[name].status == "running":
-        raise HTTPException(status_code=409, detail="Ralph loop is already running")
+        return
 
     github_username: str = user["github_username"]
     project_dir = str(DATA_DIR / github_username / name)
@@ -64,6 +61,92 @@ async def ralph_start(name: str, user: dict = Depends(get_current_user)):
     )
     _loops[name] = loop
     await loop.start()
+
+
+@router.post("/{name}/ralph/checkout")
+async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
+    """Create a Stripe checkout session or grant free tier access."""
+    project = await _get_project(name, user)
+
+    # Count how many of this user's projects already have a payment
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM projects WHERE user_id = ? AND stripe_payment_id IS NOT NULL",
+            (user["id"],),
+        )
+        row = await cursor.fetchone()
+        paid_count = row[0]
+
+    # Free tier: first project is free if no projects have been paid for yet
+    if paid_count == 0 and project.get("stripe_payment_id") is None:
+        await _start_ralph_loop(name, project, user)
+        return {"free": True, "redirect": None}
+
+    # Create Stripe Checkout Session
+    checkout_session = stripe.checkout.Session.create(
+        mode="payment",
+        line_items=[
+            {
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": 2000,
+                    "product_data": {
+                        "name": f"Just Ralph It — {name}",
+                    },
+                },
+                "quantity": 1,
+            }
+        ],
+        success_url=f"https://justralph.it/project/{name}?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"https://justralph.it/project/{name}?payment=cancel",
+        client_reference_id=str(project["id"]),
+        metadata={"user_id": str(user["id"]), "project_name": name},
+    )
+
+    return {"free": False, "redirect": checkout_session.url}
+
+
+@router.get("/{name}/ralph/payment-callback")
+async def ralph_payment_callback(
+    name: str,
+    session_id: str = Query(...),
+    user: dict = Depends(get_current_user),
+):
+    """Verify Stripe payment and start Ralph loop."""
+    project = await _get_project(name, user)
+
+    # Retrieve the Stripe session
+    session = stripe.checkout.Session.retrieve(session_id)
+
+    if session.payment_status != "paid":
+        raise HTTPException(status_code=402, detail="Payment not confirmed")
+
+    if session.client_reference_id != str(project["id"]):
+        raise HTTPException(status_code=400, detail="Session does not match project")
+
+    # Store payment ID
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE projects SET stripe_payment_id = ? WHERE id = ?",
+            (session_id, project["id"]),
+        )
+        await db.commit()
+
+    # Start Ralph loop
+    await _start_ralph_loop(name, project, user)
+
+    return {"status": "started"}
+
+
+@router.post("/{name}/ralph/start")
+async def ralph_start(name: str, user: dict = Depends(get_current_user)):
+    """Begin the Ralph loop for a project."""
+    project = await _get_project(name, user)
+
+    if name in _loops and _loops[name].status == "running":
+        raise HTTPException(status_code=409, detail="Ralph loop is already running")
+
+    await _start_ralph_loop(name, project, user)
 
     return {"status": "running"}
 
