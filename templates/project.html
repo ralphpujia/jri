@@ -228,6 +228,12 @@
         justify-content: center;
         margin-bottom: 0.5rem;
     }
+    .jri-msg {
+        align-self: flex-start;
+        background: transparent;
+        border: none;
+        padding: 0.3rem 0;
+    }
     .btn-jri, .btn-stop, .btn-resume {
         padding: 0.5rem 1.2rem;
         border: none;
@@ -1151,6 +1157,8 @@
        ══════════════════════════════════════════════ */
     function checkJriVisibility(responseText) {
         if (responseText && /just ralph it/i.test(responseText)) {
+            // Don't re-add if one already exists in the chat area
+            if (document.querySelector('.jri-msg')) return;
             showJriButton();
         }
         // Always refresh project state for stop/resume buttons
@@ -1158,8 +1166,9 @@
     }
 
     function showJriButton() {
-        jriBtnArea.innerHTML = '';
-        jriBtnArea.style.display = 'flex';
+        // Insert JRI button inline in the chat area, after Ralphy's message
+        var wrapper = document.createElement('div');
+        wrapper.className = 'chat-msg assistant jri-msg';
         var jriBtn = document.createElement('button');
         jriBtn.className = 'btn-jri';
         jriBtn.textContent = 'Just Ralph It';
@@ -1170,7 +1179,8 @@
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.free) {
-                        jriBtnArea.style.display = 'none';
+                        var msg = document.querySelector('.jri-msg');
+                        if (msg) msg.remove();
                         refreshProject();
                     } else if (data.redirect) {
                         window.location.href = data.redirect;
@@ -1181,7 +1191,8 @@
                     jriBtn.textContent = 'Just Ralph It';
                 });
         });
-        jriBtnArea.appendChild(jriBtn);
+        wrapper.appendChild(jriBtn);
+        chatMessages.insertBefore(wrapper, thinkingEl);
     }
 
     function updateJriButtons() {
@@ -1191,8 +1202,11 @@
 
         var status = projectData.ralph_loop_status;
 
-        // If Ralph is running or stopping, show Stop (and Resume if stopped)
+        // When Ralph starts running, remove the inline JRI button from chat
         if (status === 'running' || status === 'stopping') {
+            var jriMsg = document.querySelector('.jri-msg');
+            if (jriMsg) jriMsg.remove();
+
             jriBtnArea.style.display = 'flex';
             var stopBtn = document.createElement('button');
             stopBtn.className = 'btn-stop';
@@ -1223,8 +1237,9 @@
             return;
         }
 
-        // Idle: JRI button is shown by Ralphy's response, not by issue status polling
-        // Do nothing here — showJriButton() handles it when Ralphy mentions "Just Ralph It"
+        // Idle: JRI button lives in the chat area (inserted by showJriButton),
+        // stop/resume buttons use jriBtnArea. Nothing to do here for idle.
+        jriBtnArea.style.display = 'none';
     }
 
     /* ══════════════════════════════════════════════
