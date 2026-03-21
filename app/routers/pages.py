@@ -35,6 +35,24 @@ async def landing(request: Request):
     return templates.TemplateResponse("landing.html", {"request": request})
 
 
+@router.get("/dashboard")
+async def dashboard(request: Request):
+    token = request.cookies.get("session")
+    if not token:
+        return RedirectResponse(url="/", status_code=302)
+    try:
+        user_id = decode_session_token(token)
+    except Exception:
+        return RedirectResponse(url="/", status_code=302)
+    async with get_db() as db:
+        cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+        row = await cursor.fetchone()
+    if row is None:
+        return RedirectResponse(url="/", status_code=302)
+    user = dict(row)
+    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
+
+
 @router.get("/new")
 async def new_project(request: Request):
     if not await _is_logged_in(request):

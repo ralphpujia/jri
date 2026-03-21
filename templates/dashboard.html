@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Just Ralph It{% endblock %}
+
+{% block head %}
+<style>
+    nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 2rem;
+        border-bottom: 1px solid #222;
+    }
+    nav a.brand {
+        color: #e0e0e0;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    nav a.brand:hover {
+        color: #fff;
+    }
+    .nav-right {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .nav-right img {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+    }
+    .nav-right .username {
+        color: #ccc;
+        font-size: 0.95rem;
+    }
+    .nav-right a {
+        color: #999;
+        text-decoration: none;
+        font-size: 0.9rem;
+    }
+    .nav-right a:hover {
+        color: #fff;
+    }
+    .container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+    .header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+    .header-row h2 {
+        font-size: 1.8rem;
+    }
+    .btn {
+        display: inline-block;
+        padding: 0.6rem 1.2rem;
+        border: 1px solid #e0e0e0;
+        background: transparent;
+        color: #fff;
+        font-size: 0.95rem;
+        border-radius: 4px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background-color 0.2s;
+    }
+    .btn:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .project-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    .project-card {
+        background: #1a1a1a;
+        border: 1px solid #222;
+        border-radius: 6px;
+        padding: 1.2rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .project-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.3rem;
+    }
+    .project-info a.project-name {
+        color: #e0e0e0;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+    }
+    .project-info a.project-name:hover {
+        color: #fff;
+    }
+    .project-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.85rem;
+        color: #888;
+    }
+    .project-meta a {
+        color: #888;
+        text-decoration: none;
+    }
+    .project-meta a:hover {
+        color: #ccc;
+    }
+    .project-actions {
+        display: flex;
+        align-items: center;
+    }
+    .btn-delete {
+        background: none;
+        border: none;
+        color: #ff4444;
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 0.3rem 0.6rem;
+    }
+    .btn-delete:hover {
+        color: #ff6666;
+    }
+    .empty-state {
+        text-align: center;
+        margin-top: 4rem;
+        color: #888;
+    }
+    .empty-state p {
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav>
+    <a href="/dashboard" class="brand">Just Ralph It</a>
+    <div class="nav-right">
+        <img src="{{ user.github_avatar_url }}" alt="Avatar">
+        <span class="username">{{ user.github_username }}</span>
+        <a href="/auth/logout">Logout</a>
+    </div>
+</nav>
+<div class="container">
+    <div class="header-row">
+        <h2>Your Projects</h2>
+        <a href="/new" class="btn">New Project</a>
+    </div>
+    <div id="project-list" class="project-list"></div>
+    <div id="empty-state" class="empty-state" style="display:none;">
+        <p>No projects yet.</p>
+        <a href="/new" class="btn">New Project</a>
+    </div>
+</div>
+<script>
+(function() {
+    var listEl = document.getElementById('project-list');
+    var emptyEl = document.getElementById('empty-state');
+
+    function renderProjects(projects) {
+        listEl.innerHTML = '';
+        if (projects.length === 0) {
+            emptyEl.style.display = 'block';
+            return;
+        }
+        emptyEl.style.display = 'none';
+        projects.forEach(function(p) {
+            var card = document.createElement('div');
+            card.className = 'project-card';
+            card.dataset.name = p.name;
+
+            var info = document.createElement('div');
+            info.className = 'project-info';
+
+            var nameLink = document.createElement('a');
+            nameLink.className = 'project-name';
+            nameLink.href = '/project/' + encodeURIComponent(p.name);
+            nameLink.textContent = p.name;
+            info.appendChild(nameLink);
+
+            var meta = document.createElement('div');
+            meta.className = 'project-meta';
+            var issueCount = document.createElement('span');
+            issueCount.textContent = (p.issue_count || 0) + ' issues';
+            meta.appendChild(issueCount);
+
+            if (p.github_repo_url) {
+                var ghLink = document.createElement('a');
+                ghLink.href = p.github_repo_url;
+                ghLink.target = '_blank';
+                ghLink.rel = 'noopener noreferrer';
+                ghLink.textContent = 'GitHub';
+                meta.appendChild(ghLink);
+            }
+            info.appendChild(meta);
+
+            var actions = document.createElement('div');
+            actions.className = 'project-actions';
+            var delBtn = document.createElement('button');
+            delBtn.className = 'btn-delete';
+            delBtn.textContent = 'Delete';
+            delBtn.addEventListener('click', function() {
+                if (!confirm('Delete project "' + p.name + '"? This will also delete the GitHub repo.')) return;
+                fetch('/api/projects/' + encodeURIComponent(p.name) + '?delete_repo=true', { method: 'DELETE' })
+                    .then(function(res) {
+                        if (res.ok) {
+                            card.remove();
+                            if (listEl.children.length === 0) {
+                                emptyEl.style.display = 'block';
+                            }
+                        }
+                    });
+            });
+            actions.appendChild(delBtn);
+
+            card.appendChild(info);
+            card.appendChild(actions);
+            listEl.appendChild(card);
+        });
+    }
+
+    fetch('/api/projects')
+        .then(function(res) { return res.json(); })
+        .then(function(data) { renderProjects(data); })
+        .catch(function() { renderProjects([]); });
+})();
+</script>
+{% endblock %}
