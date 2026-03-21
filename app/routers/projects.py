@@ -265,6 +265,10 @@ async def create_project(
         logger.info(f"Creating project {name}: step 6 - creating uploads directory")
         (project_dir / "uploads").mkdir(exist_ok=True)
 
+        # 6b. Create .env file and .gitignore
+        (project_dir / ".env").write_text("")
+        (project_dir / ".gitignore").write_text(".env\n")
+
         # 7. Git add all and commit
         logger.info(f"Creating project {name}: step 7 - git add and commit")
         await _run(["git", "add", "."], cwd=cwd)
@@ -460,6 +464,42 @@ async def get_agents_md(name: str, user: dict = Depends(get_current_user)):
 
     content = agents_path.read_text()
     return {"content": content, "exists": True}
+
+
+@router.get("/{name}/env")
+async def get_env(name: str, user: dict = Depends(get_current_user)):
+    user_id = user["id"]
+    github_username = user["github_username"]
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Project not found")
+    env_path = DATA_DIR / github_username / name / ".env"
+    content = env_path.read_text() if env_path.exists() else ""
+    return {"content": content}
+
+
+class EnvUpdateRequest(BaseModel):
+    content: str
+
+
+@router.put("/{name}/env")
+async def update_env(name: str, body: EnvUpdateRequest, user: dict = Depends(get_current_user)):
+    user_id = user["id"]
+    github_username = user["github_username"]
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM projects WHERE user_id = ? AND name = ?",
+            (user_id, name),
+        )
+        if not await cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Project not found")
+    env_path = DATA_DIR / github_username / name / ".env"
+    env_path.write_text(body.content)
+    return {"status": "saved"}
 
 
 @router.get("/{name}")

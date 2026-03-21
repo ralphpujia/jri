@@ -680,6 +680,7 @@
             <button class="tab-btn" data-tab="issues">Issues</button>
             <button id="tab-btn-ralph" class="tab-btn" data-tab="ralph">Ralph</button>
             <button class="tab-btn" data-tab="uploads">Uploads</button>
+            <button class="tab-btn" data-tab="env">Env</button>
         </div>
         <div class="tab-content">
             <div id="tab-agents-md" class="tab-pane active">
@@ -692,11 +693,19 @@
             </div>
             <div id="tab-uploads" class="tab-pane">
                 <div id="drop-zone-overlay" class="drop-zone-overlay">Drop files here to upload</div>
-                <div class="upload-controls">
+                <div class="upload-controls" style="justify-content:space-between;align-items:center;">
+                    <span style="color:var(--text-dim);font-size:0.85rem;">Upload files for Ralphy to reference during planning</span>
                     <button id="btn-upload-file" class="btn-upload">Upload</button>
                 </div>
                 <div id="upload-list" class="upload-list"></div>
                 <input type="file" id="upload-file-input" multiple style="display:none;">
+            </div>
+            <div id="tab-env" class="tab-pane">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+                    <span style="color:var(--text-dim);font-size:0.85rem;">.env variables for this project (gitignored)</span>
+                    <button id="btn-save-env" style="padding:0.4rem 1rem;background:var(--card-bg);border:1px solid var(--border-light);color:var(--text-muted);border-radius:4px;cursor:pointer;font-size:0.85rem;">Save</button>
+                </div>
+                <textarea id="env-editor" style="width:100%;min-height:300px;background:var(--bg-secondary);color:var(--text);border:1px solid var(--border-light);border-radius:4px;padding:0.6rem;font-family:'SF Mono','Fira Code',monospace;font-size:0.82rem;resize:vertical;outline:none;line-height:1.5;" placeholder="KEY=value&#10;DATABASE_URL=postgres://..."></textarea>
             </div>
         </div>
     </div>
@@ -1264,6 +1273,7 @@
             // Lazy-load data on tab activation
             if (tab === 'agents-md') fetchAgentsMd();
             if (tab === 'uploads') fetchUploads();
+            if (tab === 'env') fetchEnv();
         });
     });
 
@@ -1550,6 +1560,43 @@
     });
 
     /* ══════════════════════════════════════════════
+       ENV TAB
+       ══════════════════════════════════════════════ */
+    var envEditor = document.getElementById('env-editor');
+    var btnSaveEnv = document.getElementById('btn-save-env');
+
+    function fetchEnv() {
+        fetch(API + '/env')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                envEditor.value = data.content || '';
+            })
+            .catch(function() {});
+    }
+
+    btnSaveEnv.addEventListener('click', function() {
+        btnSaveEnv.textContent = 'Saving...';
+        btnSaveEnv.disabled = true;
+        fetch(API + '/env', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: envEditor.value }),
+        })
+            .then(function(r) { return r.json(); })
+            .then(function() {
+                btnSaveEnv.textContent = 'Saved!';
+                setTimeout(function() {
+                    btnSaveEnv.textContent = 'Save';
+                    btnSaveEnv.disabled = false;
+                }, 1500);
+            })
+            .catch(function() {
+                btnSaveEnv.textContent = 'Save';
+                btnSaveEnv.disabled = false;
+            });
+    });
+
+    /* ══════════════════════════════════════════════
        NOTIFICATIONS
        ══════════════════════════════════════════════ */
     function fetchNotifications() {
@@ -1708,6 +1755,8 @@
         if (localStorage.getItem(STORAGE_KEY + '-jri') === 'true') {
             showJriButton();
         }
+
+        scrollChat();
 
         // 2. Auto-send description if first visit (no history and no existing session)
         if (history.length === 0 && !PROJECT_HAS_SESSION && PROJECT_DESCRIPTION) {
