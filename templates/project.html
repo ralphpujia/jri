@@ -158,6 +158,29 @@
     }
     .chat-msg p { margin: 0.3rem 0; }
     .chat-msg strong { color: var(--text-bright); }
+    /* ── Thinking/tool-use collapsible ── */
+    .chat-msg .thinking {
+        margin-bottom: 0.5rem;
+        color: var(--text-dim);
+        font-size: 0.8rem;
+    }
+    .chat-msg .thinking summary {
+        cursor: pointer;
+        font-style: italic;
+        color: var(--text-dimmer);
+        user-select: none;
+    }
+    .chat-msg .thinking .thinking-content {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.78rem;
+        color: var(--text-faint);
+        padding: 0.3rem 0 0.2rem 0.8rem;
+        line-height: 1.6;
+    }
+    .chat-msg .thinking .thinking-content div {
+        padding: 0.05rem 0;
+    }
+
     .thinking-indicator {
         align-self: flex-start;
         color: var(--text-dim);
@@ -171,7 +194,7 @@
     /* ── Chat input ── */
     .chat-controls {
         border-top: 1px solid var(--border-light);
-        padding: 0.6rem 1rem;
+        padding: 0;
     }
     .jri-btn-area {
         display: flex;
@@ -227,6 +250,9 @@
         max-height: 200px;
         line-height: 1.4;
         outline: none;
+    }
+    .chat-input-area textarea::placeholder {
+        font-size: 0.8em;
     }
     .chat-input-area textarea:disabled {
         opacity: 0.5;
@@ -852,6 +878,32 @@
                 var buffer = '';
                 var msgDiv = null;
                 var fullText = '';
+                var thinkingSteps = [];
+
+                function rebuildMsg() {
+                    if (!msgDiv) return;
+                    var html = '';
+                    if (thinkingSteps.length > 0) {
+                        html += '<details class="thinking"><summary>Thinking... (' + thinkingSteps.length + ' step' + (thinkingSteps.length !== 1 ? 's' : '') + ')</summary>';
+                        html += '<div class="thinking-content">';
+                        thinkingSteps.forEach(function(s) {
+                            html += '<div>' + escapeHtml(s) + '</div>';
+                        });
+                        html += '</div></details>';
+                    }
+                    if (fullText) {
+                        html += '<div class="message-text">' + renderMarkdown(fullText) + '</div>';
+                    }
+                    msgDiv.innerHTML = html;
+                }
+
+                function ensureMsgDiv() {
+                    if (!msgDiv) {
+                        msgDiv = document.createElement('div');
+                        msgDiv.className = 'chat-msg assistant';
+                        chatMessages.insertBefore(msgDiv, thinkingEl);
+                    }
+                }
 
                 function pump() {
                     return reader.read().then(function(result) {
@@ -872,21 +924,21 @@
                                 var evt = JSON.parse(jsonStr);
                             } catch(e) { return; }
 
-                            if (evt.type === 'text') {
+                            if (evt.type === 'tool_use') {
+                                var label = evt.name || evt.content || 'Working...';
+                                thinkingSteps.push(label);
+                                ensureMsgDiv();
+                                rebuildMsg();
+                                scrollChat();
+                            } else if (evt.type === 'text') {
                                 fullText += evt.content;
-                                if (!msgDiv) {
-                                    msgDiv = addChatMessage('assistant', renderMarkdown(fullText));
-                                } else {
-                                    msgDiv.innerHTML = renderMarkdown(fullText);
-                                }
+                                ensureMsgDiv();
+                                rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'done') {
                                 if (evt.result) fullText = evt.result;
-                                if (evt.result && !msgDiv) {
-                                    addChatMessage('assistant', renderMarkdown(evt.result));
-                                } else if (evt.result && msgDiv) {
-                                    msgDiv.innerHTML = renderMarkdown(evt.result);
-                                }
+                                ensureMsgDiv();
+                                rebuildMsg();
                             } else if (evt.type === 'error') {
                                 setProcessing(false);
                                 addChatMessage('assistant', '<span style="color:#ff4444;">Error: ' + (evt.message || 'Unknown error') + '</span>');
@@ -1439,6 +1491,11 @@
        INIT
        ══════════════════════════════════════════════ */
     function init() {
+        // Clear stale localStorage if this is a fresh project (no session yet)
+        if (!PROJECT_HAS_SESSION) {
+            localStorage.removeItem('jri-chat-' + PROJECT_NAME);
+        }
+
         // 1. Restore chat history from localStorage
         var history = loadChatHistory();
         history.forEach(function(msg) {
