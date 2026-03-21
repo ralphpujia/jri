@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 import shutil
 
@@ -11,6 +12,8 @@ from app.auth_utils import get_current_user
 from app.config import DATA_DIR, RALPH_BOT_GITHUB_TOKEN
 from app.database import get_db
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 _NAME_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$")
@@ -21,14 +24,23 @@ class CreateProjectRequest(BaseModel):
     description: str
 
 
-async def _run(args: list[str], cwd: str | None = None) -> tuple[int, str, str]:
+async def _run(
+    args: list[str], cwd: str | None = None, timeout: float = 30
+) -> tuple[int, str, str]:
     proc = await asyncio.create_subprocess_exec(
         *args,
         cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    stdout, stderr = await proc.communicate()
+    try:
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
+    except asyncio.TimeoutError:
+        proc.kill()
+        await proc.wait()
+        raise RuntimeError(
+            f"Command timed out after {timeout}s: {' '.join(args)}"
+        )
     return proc.returncode, stdout.decode(), stderr.decode()
 
 
@@ -163,6 +175,10 @@ async def create_project(
     name = body.name
     description = body.description
 
+    # --- Token check ---
+    if not RALPH_BOT_GITHUB_TOKEN:
+        raise HTTPException(status_code=500, detail="GitHub bot token not configured")
+
     # --- Validation ---
     if not (1 <= len(name) <= 100) or not _NAME_RE.match(name):
         raise HTTPException(status_code=400, detail="Invalid project name")
@@ -190,15 +206,18 @@ async def create_project(
 
     try:
         # 1. Create project directory
+        logger.info(f"Creating project {name}: step 1 - creating project directory")
         project_dir.mkdir(parents=True, exist_ok=True)
         cwd = str(project_dir)
 
         # 2. git init
+        logger.info(f"Creating project {name}: step 2 - git init")
         rc, _, err = await _run(["git", "init"], cwd=cwd)
         if rc != 0:
             raise RuntimeError(f"git init failed: {err}")
 
         # 3. git config
+        logger.info(f"Creating project {name}: step 3 - git config")
         await _run(["git", "config", "user.name", "ralphpujia"], cwd=cwd)
         await _run(
             ["git", "config", "user.email", "ralphpujia@users.noreply.github.com"],
@@ -206,11 +225,13 @@ async def create_project(
         )
 
         # 4. bd init
+        logger.info(f"Creating project {name}: step 4 - bd init")
         rc, _, err = await _run(["bd", "init"], cwd=cwd)
         if rc != 0:
             raise RuntimeError(f"bd init failed: {err}")
 
         # 5. Create AGENTS.md
+        logger.info(f"Creating project {name}: step 5 - creating AGENTS.md")
         agents_md = (
             f"# {name}\n"
             f"\n"
@@ -223,9 +244,11 @@ async def create_project(
         (project_dir / "AGENTS.md").write_text(agents_md)
 
         # 6. Create uploads/ directory
+        logger.info(f"Creating project {name}: step 6 - creating uploads directory")
         (project_dir / "uploads").mkdir(exist_ok=True)
 
         # 7. Git add all and commit
+        logger.info(f"Creating project {name}: step 7 - git add and commit")
         await _run(["git", "add", "."], cwd=cwd)
         commit_msg = (
             f"Initial project setup\n"
@@ -237,6 +260,7 @@ async def create_project(
             raise RuntimeError(f"git commit failed: {err}")
 
         # 8. Create GitHub repo
+        logger.info(f"Creating project {name}: step 8 - creating GitHub repo")
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github+json",
@@ -263,6 +287,7 @@ async def create_project(
                 )
 
             # 9. Add user as collaborator
+            logger.info(f"Creating project {name}: step 9 - adding collaborator {github_username}")
             resp2 = await client.put(
                 f"https://api.github.com/repos/ralphpujia/{name}/collaborators/{github_username}",
                 headers=headers,
@@ -275,6 +300,7 @@ async def create_project(
                 )
 
         # 10. Add remote
+        logger.info(f"Creating project {name}: step 10 - adding git remote")
         rc, _, err = await _run(
             [
                 "git",
@@ -289,6 +315,7 @@ async def create_project(
             raise RuntimeError(f"git remote add failed: {err}")
 
         # 11. Push
+        logger.info(f"Creating project {name}: step 11 - git push")
         rc, _, err = await _run(["git", "push", "-u", "origin", "main"], cwd=cwd)
         if rc != 0:
             raise RuntimeError(f"git push failed: {err}")

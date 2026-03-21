@@ -132,6 +132,8 @@
 
         submitBtn.textContent = 'Creating...';
         submitBtn.disabled = true;
+        nameInput.disabled = true;
+        descInput.disabled = true;
 
         try {
             const res = await fetch('/api/projects', {
@@ -157,6 +159,8 @@
 
         submitBtn.textContent = 'Create Project';
         submitBtn.disabled = false;
+        nameInput.disabled = false;
+        descInput.disabled = false;
     });
 })();
 </script>
