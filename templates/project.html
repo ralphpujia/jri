@@ -263,7 +263,6 @@
     .btn-attach, .btn-send {
         background: none;
         border: none;
-        border-left: 1px solid var(--border);
         color: var(--text-muted);
         border-radius: 0;
         padding: 0 0.7rem;
@@ -272,6 +271,12 @@
         white-space: nowrap;
         display: flex;
         align-items: center;
+    }
+    .btn-attach {
+        border-right: 1px solid var(--border);
+    }
+    .btn-send {
+        border-left: 1px solid var(--border);
     }
     .btn-attach:hover, .btn-send:hover {
         background: var(--hover-bg);
