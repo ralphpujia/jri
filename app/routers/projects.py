@@ -35,8 +35,11 @@ async def _run(
     )
     try:
         stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=timeout)
-    except asyncio.TimeoutError:
-        proc.kill()
+    except (asyncio.TimeoutError, TimeoutError):
+        try:
+            proc.kill()
+        except ProcessLookupError:
+            pass
         await proc.wait()
         raise RuntimeError(
             f"Command timed out after {timeout}s: {' '.join(args)}"
@@ -226,7 +229,9 @@ async def create_project(
 
         # 4. bd init
         logger.info(f"Creating project {name}: step 4 - bd init")
-        rc, _, err = await _run(["bd", "init"], cwd=cwd)
+        rc, _, err = await _run(
+            ["bd", "init", "--shared-server"], cwd=cwd, timeout=60
+        )
         if rc != 0:
             raise RuntimeError(f"bd init failed: {err}")
 
