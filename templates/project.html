@@ -205,14 +205,19 @@
     .btn-resume:hover { opacity: 0.85; }
     .chat-input-area {
         display: flex;
-        align-items: flex-end;
-        gap: 0.5rem;
+        align-items: stretch;
+        border: 1px solid #333;
+        border-radius: 6px;
+        background: #1a1a1a;
+        overflow: hidden;
+    }
+    .chat-input-area:focus-within {
+        border-color: #555;
     }
     .chat-input-area textarea {
         flex: 1;
-        background: #1a1a1a;
-        border: 1px solid #333;
-        border-radius: 6px;
+        background: transparent;
+        border: none;
         color: #e0e0e0;
         padding: 0.5rem 0.7rem;
         font-family: inherit;
@@ -223,25 +228,25 @@
         line-height: 1.4;
         outline: none;
     }
-    .chat-input-area textarea:focus {
-        border-color: #555;
-    }
     .chat-input-area textarea:disabled {
         opacity: 0.5;
         cursor: not-allowed;
     }
     .btn-attach, .btn-send {
         background: none;
-        border: 1px solid #333;
+        border: none;
+        border-left: 1px solid #333;
         color: #ccc;
-        border-radius: 6px;
-        padding: 0.45rem 0.7rem;
+        border-radius: 0;
+        padding: 0 0.7rem;
         cursor: pointer;
         font-size: 0.85rem;
         white-space: nowrap;
+        display: flex;
+        align-items: center;
     }
     .btn-attach:hover, .btn-send:hover {
-        border-color: #555;
+        background: #252525;
         color: #fff;
     }
     .btn-send:disabled, .btn-attach:disabled {

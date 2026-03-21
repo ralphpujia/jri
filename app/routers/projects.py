@@ -201,7 +201,7 @@ async def create_project(
             raise HTTPException(status_code=409, detail="Project name already exists")
 
     project_dir = DATA_DIR / github_username / name
-    github_repo_url = f"https://github.com/ralphpujia/{name}"
+    github_repo_url = f"https://github.com/ralphpujia/{github_username}-{name}"
     token = RALPH_BOT_GITHUB_TOKEN
 
     try:
@@ -259,37 +259,55 @@ async def create_project(
         if rc != 0:
             raise RuntimeError(f"git commit failed: {err}")
 
-        # 8. Create GitHub repo
+        # 8. Create GitHub repo (with retry on 422 "already exists")
         logger.info(f"Creating project {name}: step 8 - creating GitHub repo")
         headers = {
             "Authorization": f"token {token}",
             "Accept": "application/vnd.github+json",
         }
         async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.github.com/user/repos",
-                headers=headers,
-                json={
-                    "name": name,
-                    "description": description,
-                    "private": False,
-                    "auto_init": False,
-                },
-                timeout=30,
-            )
-            if resp.status_code == 422 and "already exists" in resp.text.lower():
-                raise HTTPException(
-                    status_code=409, detail="GitHub repo already exists"
+            max_attempts = 2
+            for attempt in range(1, max_attempts + 1):
+                resp = await client.post(
+                    "https://api.github.com/user/repos",
+                    headers=headers,
+                    json={
+                        "name": f"{github_username}-{name}",
+                        "description": description,
+                        "private": True,
+                        "auto_init": False,
+                    },
+                    timeout=30,
                 )
-            if resp.status_code >= 400:
-                raise RuntimeError(
-                    f"GitHub create repo failed ({resp.status_code}): {resp.text}"
-                )
+                if resp.status_code == 422 and "already exists" in resp.text.lower():
+                    if attempt < max_attempts:
+                        logger.info(
+                            f"Creating project {name}: GitHub repo already exists, "
+                            f"retrying in 2s (attempt {attempt}/{max_attempts})"
+                        )
+                        await asyncio.sleep(2)
+                        continue
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "A GitHub repo with this name already exists or was recently deleted. "
+                            "Please wait a moment and try again, or choose a different name."
+                        ),
+                    )
+                if resp.status_code == 422:
+                    raise RuntimeError(
+                        f"GitHub repo validation error ({resp.status_code}): {resp.text}"
+                    )
+                if resp.status_code >= 400:
+                    raise RuntimeError(
+                        f"GitHub create repo failed ({resp.status_code}): {resp.text}"
+                    )
+                break  # success
 
             # 9. Add user as collaborator
             logger.info(f"Creating project {name}: step 9 - adding collaborator {github_username}")
             resp2 = await client.put(
-                f"https://api.github.com/repos/ralphpujia/{name}/collaborators/{github_username}",
+                f"https://api.github.com/repos/ralphpujia/{github_username}-{name}/collaborators/{github_username}",
                 headers=headers,
                 json={"permission": "push"},
                 timeout=30,
@@ -307,7 +325,7 @@ async def create_project(
                 "remote",
                 "add",
                 "origin",
-                f"https://x-access-token:{token}@github.com/ralphpujia/{name}.git",
+                f"https://x-access-token:{token}@github.com/ralphpujia/{github_username}-{name}.git",
             ],
             cwd=cwd,
         )
@@ -326,6 +344,7 @@ async def create_project(
             shutil.rmtree(project_dir)
         raise
     except Exception as exc:
+        logger.exception(f"Failed to create project {name}")
         # Clean up on any failure
         if project_dir.exists():
             shutil.rmtree(project_dir)
@@ -487,7 +506,7 @@ async def delete_project(
         }
         async with httpx.AsyncClient() as client:
             resp = await client.delete(
-                f"https://api.github.com/repos/ralphpujia/{name}",
+                f"https://api.github.com/repos/ralphpujia/{github_username}-{name}",
                 headers=headers,
                 timeout=30,
             )
