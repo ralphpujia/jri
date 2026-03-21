@@ -903,6 +903,10 @@
     function sendMessage() {
         var text = chatInput.value.trim();
         if (!text || ralphyProcessing) return;
+        if (text.length > 50000) {
+            alert('Message is too long. Maximum 50,000 characters.');
+            return;
+        }
 
         addChatMessage('user', renderMarkdown(text));
         appendToHistory('user', text);

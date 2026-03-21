@@ -18,6 +18,7 @@ from app.sse_bus import sse_bus
 router = APIRouter(prefix="/api/projects", tags=["chat"])
 
 ALLOWED_TOOLS = "Bash(bd:*) Bash(git:*) Read Glob Grep Write(AGENTS.md) Edit(AGENTS.md)"
+MAX_MESSAGE_LENGTH = 50_000
 
 ALLOWED_MIME_TYPES = {
     "image/png",
@@ -274,6 +275,12 @@ async def chat(
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid JSON body.")
         user_message = body.message
+
+    if len(user_message) > MAX_MESSAGE_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Message too long. Maximum {MAX_MESSAGE_LENGTH} characters.",
+        )
 
     session_id, is_new = await _ensure_session_id(
         project["id"], project.get("ralph_session_id")
