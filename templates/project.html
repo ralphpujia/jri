@@ -986,9 +986,12 @@
                 var hasContent = false;
                 function rebuildMsg() {
                     if (!msgDiv) return;
+                    // Preserve <details> open state across rebuilds
+                    var existingDetails = msgDiv.querySelector('details.thinking');
+                    var wasOpen = existingDetails ? existingDetails.open : true;
                     var html = '';
                     if (thinkingText || thinkingSteps.length > 0) {
-                        html += '<details class="thinking"><summary>Thinking...</summary>';
+                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>Thinking...</summary>';
                         html += '<div class="thinking-content">';
                         if (thinkingText) {
                             html += '<div>' + escapeHtml(thinkingText) + '</div>';
