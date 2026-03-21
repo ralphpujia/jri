@@ -1049,6 +1049,8 @@
                             } else if (evt.type === 'tool_use') {
                                 var label = evt.name || 'Working...';
                                 thinkingSteps.push(label);
+                                // Refresh issues when Ralphy uses Bash (likely bd commands)
+                                if (evt.name === 'Bash') { fetchIssues(); fetchAgentsMd(); }
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
@@ -1061,6 +1063,9 @@
                                 if (evt.result) fullText = evt.result;
                                 ensureMsgDiv();
                                 rebuildMsg();
+                                // Refresh issues and AGENTS.md after Ralphy finishes
+                                fetchIssues();
+                                fetchAgentsMd();
                             } else if (evt.type === 'error') {
                                 setProcessing(false);
                                 addChatMessage('assistant', '<span style="color:#ff4444;">Error: ' + (evt.message || 'Unknown error') + '</span>');
