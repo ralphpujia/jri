@@ -11,7 +11,7 @@ from app.auth_utils import get_current_user
 from app.config import DATA_DIR, RALPH_BOT_GITHUB_TOKEN
 from app.database import get_db
 
-router = APIRouter(prefix="/projects", tags=["projects"])
+router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 _NAME_RE = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$")
 
