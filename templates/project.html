@@ -941,16 +941,22 @@
                 var msgDiv = null;
                 var fullText = '';
                 var thinkingSteps = [];
+                var thinkingText = '';
 
                 function rebuildMsg() {
                     if (!msgDiv) return;
                     var html = '';
-                    if (thinkingSteps.length > 0) {
-                        html += '<details class="thinking"><summary>Thinking... (' + thinkingSteps.length + ' step' + (thinkingSteps.length !== 1 ? 's' : '') + ')</summary>';
+                    if (thinkingText || thinkingSteps.length > 0) {
+                        html += '<details class="thinking"><summary>Thinking...</summary>';
                         html += '<div class="thinking-content">';
-                        thinkingSteps.forEach(function(s) {
-                            html += '<div>' + escapeHtml(s) + '</div>';
-                        });
+                        if (thinkingText) {
+                            html += '<div>' + escapeHtml(thinkingText) + '</div>';
+                        }
+                        if (thinkingSteps.length > 0) {
+                            thinkingSteps.forEach(function(s) {
+                                html += '<div>Tool: ' + escapeHtml(s) + '</div>';
+                            });
+                        }
                         html += '</div></details>';
                     }
                     if (fullText) {
@@ -986,8 +992,13 @@
                                 var evt = JSON.parse(jsonStr);
                             } catch(e) { return; }
 
-                            if (evt.type === 'tool_use') {
-                                var label = evt.name || evt.content || 'Working...';
+                            if (evt.type === 'thinking') {
+                                thinkingText += evt.content;
+                                ensureMsgDiv();
+                                rebuildMsg();
+                                scrollChat();
+                            } else if (evt.type === 'tool_use') {
+                                var label = evt.name || 'Working...';
                                 thinkingSteps.push(label);
                                 ensureMsgDiv();
                                 rebuildMsg();

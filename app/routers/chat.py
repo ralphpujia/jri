@@ -175,17 +175,32 @@ async def _stream_claude(
             msg_type = data.get("type")
 
             if msg_type == "assistant":
-                # Extract text content from the message
+                # Extract content from the message
                 content_blocks = data.get("message", {}).get("content", [])
                 for block in content_blocks:
                     if block.get("type") == "text":
                         event = {"type": "text", "content": block["text"]}
                         yield f"data: {json.dumps(event)}\n\n"
+                    elif block.get("type") == "thinking":
+                        event = {"type": "thinking", "content": block["thinking"]}
+                        yield f"data: {json.dumps(event)}\n\n"
+                    elif block.get("type") == "tool_use":
+                        event = {"type": "tool_use", "name": block["name"]}
+                        yield f"data: {json.dumps(event)}\n\n"
+
+            elif msg_type == "content_block_start":
+                content_block = data.get("content_block", {})
+                if content_block.get("type") == "tool_use":
+                    event = {"type": "tool_use", "name": content_block["name"]}
+                    yield f"data: {json.dumps(event)}\n\n"
 
             elif msg_type == "content_block_delta":
                 delta = data.get("delta", {})
                 if delta.get("type") == "text_delta":
                     event = {"type": "text", "content": delta["text"]}
+                    yield f"data: {json.dumps(event)}\n\n"
+                elif delta.get("type") == "thinking_delta":
+                    event = {"type": "thinking", "content": delta["thinking"]}
                     yield f"data: {json.dumps(event)}\n\n"
 
             elif msg_type == "result":
