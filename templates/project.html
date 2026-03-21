@@ -528,7 +528,11 @@
         cursor: pointer;
         font-size: 0.85rem;
     }
-    .ralph-ctrl-btn:hover {
+    .ralph-ctrl-btn:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+    }
+    .ralph-ctrl-btn:hover:not(:disabled) {
         color: var(--text-bright);
         border-color: var(--border-focus);
     }
@@ -705,9 +709,9 @@
             <button class="tab-btn" data-tab="uploads">Uploads</button>
             <button class="tab-btn" data-tab="env">Env</button>
             <div style="flex:1;"></div>
-            <div id="ralph-controls" class="ralph-controls" style="display:none;">
-                <button id="btn-ralph-stop" class="ralph-ctrl-btn" title="Stop Ralph">&#9209;</button>
-                <button id="btn-ralph-resume" class="ralph-ctrl-btn" title="Resume Ralph" style="display:none;">&#9654;</button>
+            <div id="ralph-controls" class="ralph-controls">
+                <button id="btn-ralph-stop" class="ralph-ctrl-btn" title="Stop Ralph" disabled>&#9209;</button>
+                <button id="btn-ralph-resume" class="ralph-ctrl-btn" title="Resume Ralph" disabled>&#9654;</button>
             </div>
         </div>
         <div class="tab-content">
@@ -1285,26 +1289,20 @@
         // Hide jriBtnArea — stop/resume now lives in tab bar
         jriBtnArea.style.display = 'none';
 
-        // Manage ralph-controls in tab bar
+        // Manage ralph-controls in tab bar — always visible, enable/disable
         if (status === 'running') {
-            ralphControls.style.display = 'flex';
-            btnRalphStop.style.display = '';
             btnRalphStop.disabled = false;
-            btnRalphStop.style.opacity = '1';
-            btnRalphResume.style.display = 'none';
+            btnRalphResume.disabled = true;
         } else if (status === 'stopping') {
-            ralphControls.style.display = 'flex';
-            btnRalphStop.style.display = '';
             btnRalphStop.disabled = true;
-            btnRalphStop.style.opacity = '0.4';
-            btnRalphResume.style.display = 'none';
+            btnRalphResume.disabled = true;
         } else if (status === 'stopped') {
-            ralphControls.style.display = 'flex';
-            btnRalphStop.style.display = 'none';
-            btnRalphResume.style.display = '';
+            btnRalphStop.disabled = true;
+            btnRalphResume.disabled = false;
         } else {
-            // idle
-            ralphControls.style.display = 'none';
+            // idle — both disabled
+            btnRalphStop.disabled = true;
+            btnRalphResume.disabled = true;
         }
     }
 
