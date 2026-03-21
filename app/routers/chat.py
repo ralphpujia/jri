@@ -78,7 +78,6 @@ def _build_claude_args(
     args += [
         "--output-format", "stream-json",
         "--verbose",
-        "--dangerously-skip-permissions",
         "--allowedTools", ALLOWED_TOOLS,
         "--", user_message,
     ]
