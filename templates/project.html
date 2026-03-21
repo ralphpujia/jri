@@ -43,29 +43,30 @@
         border-bottom: 1px solid var(--border-light);
         min-height: 48px;
     }
-    .header-left a {
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-size: 1.05rem;
+    }
+    .header-left a.brand {
         color: var(--text);
         text-decoration: none;
         font-weight: 600;
-        font-size: 1.05rem;
     }
-    .header-left a:hover { color: var(--text-bright); }
-    .header-center {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
+    .header-left a.brand:hover { color: var(--text-bright); }
+    .header-left .separator {
+        color: var(--text-dim);
     }
-    .header-center .project-name {
+    .header-left .project-name {
         color: var(--text-bright);
         font-weight: 600;
-        font-size: 1.05rem;
     }
-    .header-center a.gh-link {
+    .header-left a.gh-link {
         color: var(--text-dim);
         text-decoration: none;
-        font-size: 0.85rem;
     }
-    .header-center a.gh-link:hover { color: var(--text-muted); }
+    .header-left a.gh-link:hover { color: var(--text-muted); }
     .header-right {
         display: flex;
         align-items: center;
@@ -592,12 +593,11 @@
 <!-- Header -->
 <header class="project-header">
     <div class="header-left">
-        <a href="/dashboard">Just Ralph It</a>
-    </div>
-    <div class="header-center">
+        <a href="/dashboard" class="brand">Just Ralph It</a>
+        <span class="separator">/</span>
         <span class="project-name">{{ project.name }}</span>
         {% if project.github_repo_url %}
-        <a href="{{ project.github_repo_url }}" target="_blank" rel="noopener noreferrer" class="gh-link">GitHub</a>
+        <a href="{{ project.github_repo_url }}" target="_blank" rel="noopener noreferrer" class="gh-link">&#8599;</a>
         {% endif %}
     </div>
     <div class="header-right">
@@ -619,7 +619,7 @@
             <div id="jri-btn-area" class="jri-btn-area" style="display:none;"></div>
             <div class="chat-input-area">
                 <button id="btn-attach" class="btn-attach" title="Attach files">Attach</button>
-                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged, Shift+Enter for new line)" rows="1"></textarea>
+                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged, Tab+Enter to send)" rows="1"></textarea>
                 <button id="btn-send" class="btn-send">Send</button>
             </div>
             <div id="attachment-names" class="attachment-names"></div>
