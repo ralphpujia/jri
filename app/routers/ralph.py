@@ -171,8 +171,9 @@ async def ralph_resume(name: str, user: dict = Depends(get_current_user)):
 
 
 @router.get("/{name}/ralph/stream")
-async def ralph_stream(name: str):
+async def ralph_stream(name: str, user: dict = Depends(get_current_user)):
     """SSE endpoint that streams Ralph's stdout in real time."""
+    await _get_project(name, user)
     loop = _loops.get(name)
     if loop is None:
         raise HTTPException(status_code=404, detail="No active Ralph loop")
