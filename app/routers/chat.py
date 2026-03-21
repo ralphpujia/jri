@@ -1,9 +1,11 @@
 import asyncio
 import json
 import os
+import shutil
 import uuid
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from starlette.responses import StreamingResponse
 
@@ -16,6 +18,16 @@ from app.sse_bus import sse_bus
 router = APIRouter(prefix="/api/projects", tags=["chat"])
 
 ALLOWED_TOOLS = "Bash(bd:*) Bash(git:*) Read Write Edit Glob Grep"
+
+ALLOWED_MIME_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "application/pdf",
+}
+MAX_FILE_SIZE = 3 * 1024 * 1024  # 3 MB
+MAX_ATTACHMENTS = 3
 
 
 class ChatRequest(BaseModel):
@@ -72,12 +84,67 @@ def _build_claude_args(
     return args
 
 
+async def _validate_attachments(attachments: list[UploadFile]) -> list[tuple[str, bytes]]:
+    """Validate attachments and return list of (filename, content) tuples."""
+    if len(attachments) > MAX_ATTACHMENTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Too many attachments. Maximum is {MAX_ATTACHMENTS}.",
+        )
+
+    validated: list[tuple[str, bytes]] = []
+    for attachment in attachments:
+        if attachment.content_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type '{attachment.content_type}' is not allowed. "
+                       f"Allowed types: {', '.join(sorted(ALLOWED_MIME_TYPES))}",
+            )
+
+        content = await attachment.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File '{attachment.filename}' exceeds the 3MB size limit.",
+            )
+
+        validated.append((attachment.filename or "unnamed", content))
+
+    return validated
+
+
+def _save_attachments(
+    project_dir: str, validated: list[tuple[str, bytes]]
+) -> tuple[Path, list[Path]]:
+    """Save validated attachments to .tmp_attachments/ and return (tmp_dir, paths)."""
+    tmp_dir = Path(project_dir) / ".tmp_attachments"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_paths: list[Path] = []
+    for filename, content in validated:
+        dest = tmp_dir / filename
+        dest.write_bytes(content)
+        saved_paths.append(dest)
+
+    return tmp_dir, saved_paths
+
+
+def _prepend_attachment_info(message: str, saved_paths: list[Path]) -> str:
+    """Prepend attachment file references to the user message."""
+    file_descriptions = ", ".join(
+        f"{p.name} (saved at {p})" for p in saved_paths
+    )
+    prefix = f"The user attached file(s): {file_descriptions}. Please read and analyze them."
+    return f"{prefix}\n\n{message}"
+
+
 async def _stream_claude(
     project_name: str,
     project_dir: str,
     session_id: str,
     is_new_session: bool,
     user_message: str,
+    tmp_attachments_dir: Path | None = None,
 ):
     """Async generator that spawns claude CLI and yields SSE events."""
     args = _build_claude_args(session_id, is_new_session, user_message)
@@ -139,18 +206,49 @@ async def _stream_claude(
         yield f"data: {json.dumps(event)}\n\n"
 
     finally:
+        # Clean up temp attachments
+        if tmp_attachments_dir and tmp_attachments_dir.exists():
+            shutil.rmtree(tmp_attachments_dir, ignore_errors=True)
         await sse_bus.publish(project_name, "ralphy_processing", {"status": "end"})
 
 
 @router.post("/{name}/chat")
 async def chat(
     name: str,
-    body: ChatRequest,
+    request: Request,
     user: dict = Depends(get_current_user),
 ):
     project = await _get_project_for_user(user, name)
     github_username: str = user["github_username"]
     project_dir = str(DATA_DIR / github_username / name)
+
+    content_type = request.headers.get("content-type", "")
+    tmp_attachments_dir: Path | None = None
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        message = form.get("message")
+        if not message or not isinstance(message, str):
+            raise HTTPException(status_code=400, detail="Field 'message' is required.")
+
+        attachments: list[UploadFile] = [
+            v for _, v in form.multi_items()
+            if isinstance(v, UploadFile)
+        ]
+
+        if attachments:
+            validated = await _validate_attachments(attachments)
+            tmp_attachments_dir, saved_paths = _save_attachments(project_dir, validated)
+            message = _prepend_attachment_info(message, saved_paths)
+
+        user_message = message
+    else:
+        # Assume JSON
+        try:
+            body = ChatRequest(**(await request.json()))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON body.")
+        user_message = body.message
 
     session_id, is_new = await _ensure_session_id(
         project["id"], project.get("ralph_session_id")
@@ -162,7 +260,8 @@ async def chat(
             project_dir=project_dir,
             session_id=session_id,
             is_new_session=is_new,
-            user_message=body.message,
+            user_message=user_message,
+            tmp_attachments_dir=tmp_attachments_dir,
         ),
         media_type="text/event-stream",
         headers={
