@@ -676,19 +676,19 @@
     <!-- Right panel: Tabs -->
     <div class="right-panel">
         <div class="tab-bar">
-            <button class="tab-btn active" data-tab="issues">Issues</button>
-            <button class="tab-btn" data-tab="agents-md">AGENTS.md</button>
-            <button id="tab-btn-ralph" class="tab-btn" data-tab="ralph" style="display:none;">Ralph</button>
+            <button class="tab-btn active" data-tab="agents-md">Overview</button>
+            <button class="tab-btn" data-tab="issues">Issues</button>
+            <button id="tab-btn-ralph" class="tab-btn" data-tab="ralph">Ralph</button>
             <button class="tab-btn" data-tab="uploads">Uploads</button>
         </div>
         <div class="tab-content">
-            <div id="tab-issues" class="tab-pane active"></div>
-            <div id="tab-agents-md" class="tab-pane">
+            <div id="tab-agents-md" class="tab-pane active">
                 <div class="agents-md-content" id="agents-md-body"></div>
             </div>
+            <div id="tab-issues" class="tab-pane"></div>
             <div id="tab-ralph" class="tab-pane">
                 <div id="ralph-working-on" class="ralph-working-on" style="display:none;"></div>
-                <div id="ralph-terminal" class="ralph-terminal"></div>
+                <div id="ralph-terminal" class="ralph-terminal">Ralph's build output will appear here once you start the build.</div>
             </div>
             <div id="tab-uploads" class="tab-pane">
                 <div id="drop-zone-overlay" class="drop-zone-overlay">Drop files here to upload</div>
@@ -771,7 +771,7 @@
     /* ══════════════════════════════════════════════
        MARKDOWN RENDERER (basic)
        ══════════════════════════════════════════════ */
-    function renderMarkdown(text) {
+    function renderMarkdown(text, blockMode) {
         if (!text) return '';
         // Escape HTML
         var s = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -840,10 +840,12 @@
         s = s.replace(/\n{2,}/g, '</p><p>');
         s = '<p>' + s + '</p>';
 
-        // Single newlines to <br>
-        s = s.replace(/\n/g, '<br>');
+        // Single newlines to <br> (skip in block mode — headers, lists, paragraphs already have margins)
+        if (!blockMode) {
+            s = s.replace(/\n/g, '<br>');
+        }
 
-        // Remove <br> inside lists
+        // Remove <br> inside lists (only relevant when not in block mode, but safe either way)
         s = s.replace(/<\/li><br>/g, '</li>');
         s = s.replace(/<br><li>/g, '<li>');
         s = s.replace(/<ul><br>/g, '<ul>');
@@ -1263,11 +1265,11 @@
     });
 
     function showRalphTab() {
-        tabBtnRalph.style.display = '';
+        // no-op: Ralph tab is always visible
     }
 
     function hideRalphTab() {
-        tabBtnRalph.style.display = 'none';
+        // no-op: Ralph tab is always visible
     }
 
     /* ══════════════════════════════════════════════
@@ -1377,7 +1379,7 @@
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.exists && data.content) {
-                    agentsMdBody.innerHTML = renderMarkdown(data.content);
+                    agentsMdBody.innerHTML = renderMarkdown(data.content, true);
                     agentsMdBody.className = 'agents-md-content';
                 } else {
                     agentsMdBody.innerHTML = '<p class="agents-md-placeholder">AGENTS.md will appear here as Ralphy defines the project structure.</p>';
@@ -1389,7 +1391,12 @@
     /* ══════════════════════════════════════════════
        RALPH TAB
        ══════════════════════════════════════════════ */
+    var ralphHasOutput = false;
     function appendRalphLine(line) {
+        if (!ralphHasOutput) {
+            ralphTerminal.textContent = '';
+            ralphHasOutput = true;
+        }
         ralphTerminal.textContent += line + '\n';
         ralphTerminal.scrollTop = ralphTerminal.scrollHeight;
     }
