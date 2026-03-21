@@ -983,6 +983,7 @@
                 var fullText = '';
                 var thinkingSteps = [];
                 var thinkingText = '';
+                var hasContent = false;
                 function rebuildMsg() {
                     if (!msgDiv) return;
                     var html = '';
@@ -1031,6 +1032,11 @@
                             try {
                                 var evt = JSON.parse(jsonStr);
                             } catch(e) { return; }
+
+                            if (!hasContent && (evt.type === 'thinking' || evt.type === 'text' || evt.type === 'tool_use')) {
+                                hasContent = true;
+                                thinkingEl.className = 'thinking-indicator';
+                            }
 
                             if (evt.type === 'thinking') {
                                 thinkingText += evt.content;
