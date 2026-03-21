@@ -485,12 +485,16 @@
     }
 
     /* ── Ralph tab ── */
+    #tab-ralph {
+        padding: 0;
+    }
     .ralph-terminal {
         background: var(--bg-secondary);
         font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
         font-size: 0.8rem;
         line-height: 1.4;
         padding: 0.8rem;
+        margin: 0;
         white-space: pre-wrap;
         word-break: break-all;
         color: var(--text-dimmer);
@@ -508,6 +512,25 @@
         color: #4caf50;
         font-weight: 600;
         margin-top: 0.5rem;
+    }
+    .ralph-controls {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding-right: 0.5rem;
+    }
+    .ralph-ctrl-btn {
+        background: none;
+        border: 1px solid var(--border-light);
+        color: var(--text-dim);
+        border-radius: 4px;
+        padding: 0.2rem 0.5rem;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+    .ralph-ctrl-btn:hover {
+        color: var(--text-bright);
+        border-color: var(--border-focus);
     }
 
     /* ── Uploads tab ── */
@@ -681,6 +704,11 @@
             <button id="tab-btn-ralph" class="tab-btn" data-tab="ralph">Ralph</button>
             <button class="tab-btn" data-tab="uploads">Uploads</button>
             <button class="tab-btn" data-tab="env">Env</button>
+            <div style="flex:1;"></div>
+            <div id="ralph-controls" class="ralph-controls" style="display:none;">
+                <button id="btn-ralph-stop" class="ralph-ctrl-btn" title="Stop Ralph">&#9209;</button>
+                <button id="btn-ralph-resume" class="ralph-ctrl-btn" title="Resume Ralph" style="display:none;">&#9654;</button>
+            </div>
         </div>
         <div class="tab-content">
             <div id="tab-agents-md" class="tab-pane active">
@@ -1215,9 +1243,25 @@
         chatMessages.insertBefore(wrapper, thinkingEl);
     }
 
-    function updateJriButtons() {
-        jriBtnArea.innerHTML = '';
+    var ralphControls = document.getElementById('ralph-controls');
+    var btnRalphStop = document.getElementById('btn-ralph-stop');
+    var btnRalphResume = document.getElementById('btn-ralph-resume');
 
+    btnRalphStop.addEventListener('click', function() {
+        btnRalphStop.disabled = true;
+        btnRalphStop.style.opacity = '0.4';
+        fetch(API + '/ralph/stop', { method: 'POST' }).then(function() {
+            refreshProject();
+        });
+    });
+
+    btnRalphResume.addEventListener('click', function() {
+        fetch(API + '/ralph/start', { method: 'POST' }).then(function() {
+            refreshProject();
+        });
+    });
+
+    function updateJriButtons() {
         if (!projectData) return;
 
         var status = projectData.ralph_loop_status;
@@ -1236,40 +1280,32 @@
                     jriBtn.style.color = 'var(--text-dim)';
                 }
             }
-
-            jriBtnArea.style.display = 'flex';
-            var stopBtn = document.createElement('button');
-            stopBtn.className = 'btn-stop';
-            stopBtn.textContent = status === 'stopping' ? 'Stopping...' : 'Stop Ralph';
-            stopBtn.disabled = status === 'stopping';
-            stopBtn.addEventListener('click', function() {
-                stopBtn.textContent = 'Stopping...';
-                stopBtn.disabled = true;
-                fetch(API + '/ralph/stop', { method: 'POST' }).then(function() {
-                    refreshProject();
-                });
-            });
-            jriBtnArea.appendChild(stopBtn);
-            return;
         }
 
-        if (status === 'stopped') {
-            jriBtnArea.style.display = 'flex';
-            var resumeBtn = document.createElement('button');
-            resumeBtn.className = 'btn-resume';
-            resumeBtn.textContent = 'Resume Ralph';
-            resumeBtn.addEventListener('click', function() {
-                fetch(API + '/ralph/start', { method: 'POST' }).then(function() {
-                    refreshProject();
-                });
-            });
-            jriBtnArea.appendChild(resumeBtn);
-            return;
-        }
-
-        // Idle: JRI button lives in the chat area (inserted by showJriButton),
-        // stop/resume buttons use jriBtnArea. Nothing to do here for idle.
+        // Hide jriBtnArea — stop/resume now lives in tab bar
         jriBtnArea.style.display = 'none';
+
+        // Manage ralph-controls in tab bar
+        if (status === 'running') {
+            ralphControls.style.display = 'flex';
+            btnRalphStop.style.display = '';
+            btnRalphStop.disabled = false;
+            btnRalphStop.style.opacity = '1';
+            btnRalphResume.style.display = 'none';
+        } else if (status === 'stopping') {
+            ralphControls.style.display = 'flex';
+            btnRalphStop.style.display = '';
+            btnRalphStop.disabled = true;
+            btnRalphStop.style.opacity = '0.4';
+            btnRalphResume.style.display = 'none';
+        } else if (status === 'stopped') {
+            ralphControls.style.display = 'flex';
+            btnRalphStop.style.display = 'none';
+            btnRalphResume.style.display = '';
+        } else {
+            // idle
+            ralphControls.style.display = 'none';
+        }
     }
 
     /* ══════════════════════════════════════════════
@@ -1583,6 +1619,7 @@
     var btnResetEnv = document.getElementById('btn-reset-env');
 
     btnResetEnv.addEventListener('click', function() {
+        if (!confirm('Discard unsaved changes?')) return;
         fetchEnv();
     });
 
@@ -1684,6 +1721,11 @@
             } catch(err) {}
         });
 
+        es.addEventListener('ralph_stdout_clear', function(e) {
+            ralphTerminal.textContent = '';
+            ralphHasOutput = false;
+        });
+
         es.addEventListener('ralph_status', function(e) {
             try {
                 var data = JSON.parse(e.data);
@@ -1754,6 +1796,22 @@
         }
 
         updateJriButtons();
+
+        // Fetch ralph status and populate terminal with recent output
+        fetch(API + '/ralph/status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.recent_output && data.recent_output.length > 0) {
+                    // Clear placeholder if present
+                    if (ralphHasOutput === false || ralphTerminal.textContent.includes('will appear here')) {
+                        ralphTerminal.textContent = '';
+                    }
+                    data.recent_output.forEach(function(line) {
+                        appendRalphLine(line);
+                    });
+                }
+            })
+            .catch(function() {});
     }
 
     /* ══════════════════════════════════════════════

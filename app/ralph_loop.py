@@ -208,6 +208,10 @@ class RalphLoop:
                     env=self._env({"BD_ACTOR": "ralph"}),
                 )
 
+                # --- Clear stdout for new issue ---
+                self.stdout_lines.clear()
+                await sse_bus.publish(self.project_name, "ralph_stdout_clear", {})
+
                 # --- Build prompt ---
                 prompt = build_ralph_prompt(
                     issue, self.user_github_name, self.user_github_email,
@@ -417,20 +421,86 @@ class RalphLoop:
             line_bytes = await self.process.stdout.readline()
             if not line_bytes:
                 break
-            line = line_bytes.decode(errors="replace")
-            self.stdout_lines.append(line)
+            raw = line_bytes.decode(errors="replace").strip()
+            if not raw:
+                continue
+
+            # Try to parse stream-json and extract readable content
+            display_line = self._parse_stream_line(raw)
+            if not display_line:
+                continue
+
+            self.stdout_lines.append(display_line)
 
             # Publish to local subscribers
             for q in self._subscribers.copy():
                 try:
-                    q.put_nowait(line)
+                    q.put_nowait(display_line)
                 except asyncio.QueueFull:
                     pass
 
             # Publish to SSE bus
             await sse_bus.publish(
-                self.project_name, "ralph_stdout", {"line": line},
+                self.project_name, "ralph_stdout", {"line": display_line},
             )
+
+        self._save_stdout()
+
+    def _parse_stream_line(self, raw: str) -> str | None:
+        """Parse a stream-json line and return a human-readable string, or None to skip."""
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            return raw  # Not JSON, show as-is
+
+        msg_type = data.get("type")
+
+        if msg_type == "assistant":
+            content_blocks = data.get("message", {}).get("content", [])
+            parts = []
+            for block in content_blocks:
+                if block.get("type") == "text":
+                    parts.append(block["text"])
+                elif block.get("type") == "tool_use":
+                    name = block.get("name", "")
+                    inp = block.get("input", {})
+                    if name == "Bash":
+                        parts.append(f"$ {inp.get('command', '')}")
+                    elif name == "Write":
+                        parts.append(f"Writing {inp.get('file_path', '')}")
+                    elif name == "Edit":
+                        parts.append(f"Editing {inp.get('file_path', '')}")
+                    elif name == "Read":
+                        parts.append(f"Reading {inp.get('file_path', '')}")
+                    elif name == "Glob":
+                        parts.append(f"Searching {inp.get('pattern', '')}")
+                    elif name == "Grep":
+                        parts.append(f"Grepping {inp.get('pattern', '')}")
+                    else:
+                        parts.append(f"[{name}]")
+            return "\n".join(parts) if parts else None
+
+        elif msg_type == "content_block_delta":
+            delta = data.get("delta", {})
+            if delta.get("type") == "text_delta":
+                return delta.get("text", "")
+            return None
+
+        elif msg_type == "result":
+            result = data.get("result", "")
+            if result:
+                return "--- Done ---"
+            return None
+
+        elif msg_type == "system":
+            return None  # Skip system init messages
+
+        return None  # Skip unknown types
+
+    def _save_stdout(self) -> None:
+        """Persist stdout to disk for recovery."""
+        stdout_path = Path(self.project_dir) / ".ralph_stdout"
+        stdout_path.write_text("\n".join(self.stdout_lines))
 
     def _save_state(self) -> None:
         """Persist loop state to .ralph_state in the project directory."""

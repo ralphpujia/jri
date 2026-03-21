@@ -233,6 +233,12 @@
 
             card.appendChild(info);
             card.appendChild(actions);
+            card.style.cursor = 'pointer';
+            card.addEventListener('click', function(e) {
+                // Don't navigate if clicking the delete button
+                if (e.target.closest('.btn-delete')) return;
+                window.location.href = '/project/' + encodeURIComponent(p.name);
+            });
             listEl.appendChild(card);
         });
     }
