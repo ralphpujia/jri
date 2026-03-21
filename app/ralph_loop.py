@@ -243,7 +243,16 @@ class RalphLoop:
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )
-                await push_proc.wait()
+                push_stdout, push_stderr = await push_proc.communicate()
+                if push_proc.returncode == 0:
+                    logger.info("Pushed changes to GitHub for issue %s", self.current_issue_id)
+                else:
+                    logger.warning(
+                        "git push failed for issue %s (exit %d): %s",
+                        self.current_issue_id,
+                        push_proc.returncode,
+                        push_stderr.decode(errors="replace").strip(),
+                    )
 
                 # --- Check if issue was closed ---
                 check_proc = await asyncio.create_subprocess_exec(

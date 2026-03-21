@@ -251,6 +251,7 @@
         max-height: 200px;
         line-height: 1.4;
         outline: none;
+        overflow-y: hidden;
     }
     .chat-input-area textarea::placeholder {
         font-size: 0.8em;
@@ -808,6 +809,7 @@
     chatInput.addEventListener('input', function() {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+        this.style.overflowY = this.scrollHeight > 200 ? 'auto' : 'hidden';
     });
 
     // Tab+Enter sends, regular Enter for newline / auto-continue lists
@@ -970,7 +972,7 @@
                         if (result.done) {
                             if (fullText) appendToHistory('assistant', fullText);
                             setProcessing(false);
-                            checkJriVisibility();
+                            checkJriVisibility(fullText);
                             return;
                         }
                         buffer += decoder.decode(result.value, { stream: true });
@@ -1027,10 +1029,39 @@
     /* ══════════════════════════════════════════════
        JRI / STOP / RESUME BUTTONS
        ══════════════════════════════════════════════ */
-    function checkJriVisibility() {
-        fetchIssues().then(function() {
-            updateJriButtons();
+    function checkJriVisibility(responseText) {
+        if (responseText && /just ralph it/i.test(responseText)) {
+            showJriButton();
+        }
+        // Always refresh project state for stop/resume buttons
+        refreshProject();
+    }
+
+    function showJriButton() {
+        jriBtnArea.innerHTML = '';
+        jriBtnArea.style.display = 'flex';
+        var jriBtn = document.createElement('button');
+        jriBtn.className = 'btn-jri';
+        jriBtn.textContent = 'Just Ralph It';
+        jriBtn.addEventListener('click', function() {
+            jriBtn.disabled = true;
+            jriBtn.textContent = 'Starting...';
+            fetch(API + '/ralph/checkout', { method: 'POST' })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.free) {
+                        jriBtnArea.style.display = 'none';
+                        refreshProject();
+                    } else if (data.redirect) {
+                        window.location.href = data.redirect;
+                    }
+                })
+                .catch(function() {
+                    jriBtn.disabled = false;
+                    jriBtn.textContent = 'Just Ralph It';
+                });
         });
+        jriBtnArea.appendChild(jriBtn);
     }
 
     function updateJriButtons() {
@@ -1072,46 +1103,8 @@
             return;
         }
 
-        // Idle: show JRI button when issues exist with open status, none deferred
-        if (issuesData) {
-            var allIssues = [];
-            (issuesData.epics || []).forEach(function(e) {
-                allIssues = allIssues.concat(e.children || []);
-            });
-            allIssues = allIssues.concat(issuesData.ungrouped || []);
-
-            var hasOpen = allIssues.some(function(i) { return i.status === 'open'; });
-            var hasDeferred = allIssues.some(function(i) { return i.status === 'deferred'; });
-
-            if (hasOpen && !hasDeferred) {
-                jriBtnArea.style.display = 'flex';
-                var jriBtn = document.createElement('button');
-                jriBtn.className = 'btn-jri';
-                jriBtn.textContent = 'Just Ralph It';
-                jriBtn.addEventListener('click', function() {
-                    jriBtn.disabled = true;
-                    jriBtn.textContent = 'Starting...';
-                    fetch(API + '/ralph/checkout', { method: 'POST' })
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.free) {
-                                jriBtnArea.style.display = 'none';
-                                refreshProject();
-                            } else if (data.redirect) {
-                                window.location.href = data.redirect;
-                            }
-                        })
-                        .catch(function() {
-                            jriBtn.disabled = false;
-                            jriBtn.textContent = 'Just Ralph It';
-                        });
-                });
-                jriBtnArea.appendChild(jriBtn);
-                return;
-            }
-        }
-
-        jriBtnArea.style.display = 'none';
+        // Idle: JRI button is shown by Ralphy's response, not by issue status polling
+        // Do nothing here — showJriButton() handles it when Ralphy mentions "Just Ralph It"
     }
 
     /* ══════════════════════════════════════════════
@@ -1464,7 +1457,7 @@
         var es = new EventSource(API + '/events');
 
         es.addEventListener('issue_update', function(e) {
-            fetchIssues().then(updateJriButtons);
+            fetchIssues();
         });
 
         es.addEventListener('agents_md_update', function(e) {
@@ -1506,7 +1499,6 @@
                     setProcessing(true);
                 } else if (data.status === 'end') {
                     setProcessing(false);
-                    checkJriVisibility();
                 }
             } catch(err) {}
         });
