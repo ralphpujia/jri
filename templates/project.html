@@ -1196,8 +1196,11 @@
                 .then(function(data) {
                     if (data.free) {
                         localStorage.removeItem(STORAGE_KEY + '-jri');
-                        var msg = document.querySelector('.jri-msg');
-                        if (msg) msg.remove();
+                        jriBtn.textContent = 'Ralph is building...';
+                        jriBtn.style.opacity = '0.5';
+                        jriBtn.style.cursor = 'not-allowed';
+                        jriBtn.style.background = 'var(--border-light)';
+                        jriBtn.style.color = 'var(--text-dim)';
                         refreshProject();
                     } else if (data.redirect) {
                         window.location.href = data.redirect;
@@ -1219,10 +1222,20 @@
 
         var status = projectData.ralph_loop_status;
 
-        // When Ralph starts running, remove the inline JRI button from chat
+        // When Ralph starts running, update the inline JRI button to show building state
         if (status === 'running' || status === 'stopping') {
             var jriMsg = document.querySelector('.jri-msg');
-            if (jriMsg) jriMsg.remove();
+            if (jriMsg) {
+                var jriBtn = jriMsg.querySelector('.btn-jri');
+                if (jriBtn) {
+                    jriBtn.textContent = 'Ralph is building...';
+                    jriBtn.disabled = true;
+                    jriBtn.style.opacity = '0.5';
+                    jriBtn.style.cursor = 'not-allowed';
+                    jriBtn.style.background = 'var(--border-light)';
+                    jriBtn.style.color = 'var(--text-dim)';
+                }
+            }
 
             jriBtnArea.style.display = 'flex';
             var stopBtn = document.createElement('button');

@@ -20,7 +20,7 @@ def build_ralph_prompt(issue: dict, user_name: str, user_email: str) -> str:
     """Build the prompt that Ralph receives for a single issue."""
     issue_id = issue.get("id", "")
     title = issue.get("title", "")
-    issue_type = issue.get("type", "")
+    issue_type = issue.get("issue_type", "")
     priority = issue.get("priority", "")
     description = issue.get("description", "")
     acceptance_criteria = issue.get("acceptance_criteria", "")
@@ -176,7 +176,7 @@ class RalphLoop:
                     issues = []
 
                 # Filter out epics
-                issues = [i for i in issues if i.get("type") != "epic"]
+                issues = [i for i in issues if i.get("issue_type") != "epic"]
 
                 if not issues:
                     self.status = "stopped"
@@ -222,7 +222,7 @@ class RalphLoop:
                     "--dangerously-skip-permissions",
                     "--system-prompt", RALPH_SYSTEM_PROMPT,
                     "--allowedTools", "Bash Read Write Edit Glob Grep WebFetch WebSearch",
-                    prompt,
+                    "--", prompt,
                     cwd=self.project_dir,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
