@@ -637,12 +637,37 @@
        CONSTANTS & STATE
        ══════════════════════════════════════════════ */
     var PROJECT_NAME = {{ project.name | tojson }};
+    var PROJECT_DESCRIPTION = {{ project.description | tojson }};
+    var PROJECT_HAS_SESSION = {{ (project.ralph_session_id or '') | tojson }} !== '';
+    var STORAGE_KEY = 'jri-chat-' + PROJECT_NAME;
     var API = '/api/projects/' + encodeURIComponent(PROJECT_NAME);
     var ralphyProcessing = false;
     var currentNotifications = [];
     var attachedFiles = [];
     var issuesData = null;
     var projectData = null;
+
+    /* ══════════════════════════════════════════════
+       LOCAL STORAGE HELPERS
+       ══════════════════════════════════════════════ */
+    function loadChatHistory() {
+        try {
+            var raw = localStorage.getItem(STORAGE_KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch(e) { return []; }
+    }
+
+    function saveChatHistory(history) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+        } catch(e) {}
+    }
+
+    function appendToHistory(role, content) {
+        var history = loadChatHistory();
+        history.push({ role: role, content: content });
+        saveChatHistory(history);
+    }
 
     /* ══════════════════════════════════════════════
        DOM REFERENCES
@@ -784,6 +809,7 @@
         if (!text || ralphyProcessing) return;
 
         addChatMessage('user', renderMarkdown(text));
+        appendToHistory('user', text);
         setProcessing(true);
 
         var hasAttachments = attachedFiles.length > 0;
@@ -822,6 +848,7 @@
                 function pump() {
                     return reader.read().then(function(result) {
                         if (result.done) {
+                            if (fullText) appendToHistory('assistant', fullText);
                             setProcessing(false);
                             checkJriVisibility();
                             return;
@@ -846,6 +873,7 @@
                                 }
                                 scrollChat();
                             } else if (evt.type === 'done') {
+                                if (evt.result) fullText = evt.result;
                                 if (evt.result && !msgDiv) {
                                     addChatMessage('assistant', renderMarkdown(evt.result));
                                 } else if (evt.result && msgDiv) {
@@ -865,6 +893,14 @@
                 setProcessing(false);
                 addChatMessage('assistant', '<span style="color:#ff4444;">Failed to send message.</span>');
             });
+    }
+
+    function sendProgrammatic(text) {
+        if (!text || ralphyProcessing) return;
+        addChatMessage('user', renderMarkdown(text));
+        appendToHistory('user', text);
+        setProcessing(true);
+        fetchChat(JSON.stringify({ message: text }), true);
     }
 
     /* ══════════════════════════════════════════════
@@ -1394,19 +1430,30 @@
        INIT
        ══════════════════════════════════════════════ */
     function init() {
-        // 1. Fetch project data
+        // 1. Restore chat history from localStorage
+        var history = loadChatHistory();
+        history.forEach(function(msg) {
+            addChatMessage(msg.role, renderMarkdown(msg.content));
+        });
+
+        // 2. Auto-send description if first visit (no history and no existing session)
+        if (history.length === 0 && !PROJECT_HAS_SESSION && PROJECT_DESCRIPTION) {
+            sendProgrammatic(PROJECT_DESCRIPTION);
+        }
+
+        // 3. Fetch project data
         refreshProject();
 
-        // 2. Fetch issues
+        // 4. Fetch issues
         fetchIssues();
 
-        // 3. Fetch agents-md
+        // 5. Fetch agents-md
         fetchAgentsMd();
 
-        // 4. Connect SSE
+        // 6. Connect SSE
         connectSSE();
 
-        // 5. Fetch notifications
+        // 7. Fetch notifications
         fetchNotifications();
     }
 
