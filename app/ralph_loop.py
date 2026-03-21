@@ -309,16 +309,27 @@ class RalphLoop:
         if self.status != "running":
             return
         self.status = "stopping"
-        # If a process is running, wait for it to complete
+        # If a process is running, wait with timeout then kill
         if self.process and self.process.returncode is None:
             try:
+                await asyncio.wait_for(self.process.wait(), timeout=30)
+            except asyncio.TimeoutError:
+                logger.warning("Claude process did not exit in 30s, killing it")
+                self.process.kill()
                 await self.process.wait()
             except Exception:
                 pass
-        # Wait for the task to finish
+        # Wait for the task to finish with timeout
         if self._task and not self._task.done():
             try:
-                await self._task
+                await asyncio.wait_for(self._task, timeout=10)
+            except asyncio.TimeoutError:
+                logger.warning("Ralph loop task did not finish in 10s, cancelling")
+                self._task.cancel()
+                try:
+                    await self._task
+                except asyncio.CancelledError:
+                    pass
             except Exception:
                 pass
         self.status = "stopped"
