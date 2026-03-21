@@ -231,7 +231,7 @@
         display: flex;
         align-items: stretch;
         border: 1px solid var(--border);
-        border-radius: 6px;
+        border-radius: 0;
         background: var(--input-bg);
         overflow: hidden;
     }
@@ -619,7 +619,7 @@
             <div id="jri-btn-area" class="jri-btn-area" style="display:none;"></div>
             <div class="chat-input-area">
                 <button id="btn-attach" class="btn-attach" title="Attach files">Attach</button>
-                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged, Tab+Enter to send)" rows="1"></textarea>
+                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged, Tab+Enter to send)" rows="1" autofocus></textarea>
                 <button id="btn-send" class="btn-send">Send</button>
             </div>
             <div id="attachment-names" class="attachment-names"></div>
@@ -801,6 +801,7 @@
         btnAttach.disabled = on;
         thinkingEl.className = 'thinking-indicator' + (on ? ' visible' : '');
         if (on) scrollChat();
+        if (!on) chatInput.focus();
     }
 
     // Auto-resize textarea
@@ -1580,6 +1581,9 @@
 
         // 7. Fetch notifications
         fetchNotifications();
+
+        // 8. Auto-focus message input
+        document.getElementById('chat-input').focus();
     }
 
     init();
