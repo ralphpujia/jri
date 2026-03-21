@@ -227,13 +227,21 @@ async def create_project(
             cwd=cwd,
         )
 
-        # 4. bd init
+        # 4. bd init (with retry — shared Dolt server may need a moment)
         logger.info(f"Creating project {name}: step 4 - bd init")
-        rc, _, err = await _run(
-            ["bd", "init", "--shared-server"], cwd=cwd, timeout=60
-        )
+        for attempt in range(3):
+            rc, _, err = await _run(
+                ["bd", "init", "--shared-server", "-p", name], cwd=cwd, timeout=30
+            )
+            if rc == 0:
+                break
+            logger.warning(
+                "bd init attempt %d failed (rc=%d): %s", attempt + 1, rc, err
+            )
+            if attempt < 2:
+                await asyncio.sleep(2)
         if rc != 0:
-            raise RuntimeError(f"bd init failed: {err}")
+            raise RuntimeError(f"bd init failed after 3 attempts: {err}")
 
         # 5. Create AGENTS.md
         logger.info(f"Creating project {name}: step 5 - creating AGENTS.md")
