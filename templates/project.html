@@ -1161,6 +1161,7 @@
         if (responseText && /just ralph it/i.test(responseText)) {
             // Don't re-add if one already exists in the chat area
             if (document.querySelector('.jri-msg')) return;
+            localStorage.setItem(STORAGE_KEY + '-jri', 'true');
             showJriButton();
         }
         // Always refresh project state for stop/resume buttons
@@ -1168,6 +1169,7 @@
     }
 
     function showJriButton() {
+        if (document.querySelector('.jri-msg')) return;
         // Insert JRI button inline in the chat area, after Ralphy's message
         var wrapper = document.createElement('div');
         wrapper.className = 'chat-msg assistant jri-msg';
@@ -1181,6 +1183,7 @@
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
                     if (data.free) {
+                        localStorage.removeItem(STORAGE_KEY + '-jri');
                         var msg = document.querySelector('.jri-msg');
                         if (msg) msg.remove();
                         refreshProject();
@@ -1692,6 +1695,7 @@
         // Clear stale localStorage if this is a fresh project (no session yet)
         if (!PROJECT_HAS_SESSION) {
             localStorage.removeItem('jri-chat-' + PROJECT_NAME);
+            localStorage.removeItem(STORAGE_KEY + '-jri');
         }
 
         // 1. Restore chat history from localStorage
@@ -1699,6 +1703,11 @@
         history.forEach(function(msg) {
             addChatMessage(msg.role, renderMarkdown(msg.content));
         });
+
+        // 1b. Restore JRI button if it was showing before refresh
+        if (localStorage.getItem(STORAGE_KEY + '-jri') === 'true') {
+            showJriButton();
+        }
 
         // 2. Auto-send description if first visit (no history and no existing session)
         if (history.length === 0 && !PROJECT_HAS_SESSION && PROJECT_DESCRIPTION) {
