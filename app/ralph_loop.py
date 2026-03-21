@@ -1,0 +1,315 @@
+"""Ralph autonomous coding loop — picks issues and solves them one at a time."""
+
+import asyncio
+import collections
+import json
+import logging
+from pathlib import Path
+from typing import Optional
+
+from app.database import get_db
+from app.prompts.ralph import RALPH_SYSTEM_PROMPT
+from app.sse_bus import sse_bus
+
+logger = logging.getLogger(__name__)
+
+STDOUT_BUFFER_SIZE = 5000
+
+
+def build_ralph_prompt(issue: dict, user_name: str, user_email: str) -> str:
+    """Build the prompt that Ralph receives for a single issue."""
+    issue_id = issue.get("id", "")
+    title = issue.get("title", "")
+    issue_type = issue.get("type", "")
+    priority = issue.get("priority", "")
+    description = issue.get("description", "")
+    acceptance_criteria = issue.get("acceptance_criteria", "")
+    design = issue.get("design") or "N/A"
+    notes = issue.get("notes") or "N/A"
+
+    return (
+        f"Read AGENTS.md in the project root and any relevant subdirectories.\n"
+        f"Then read this issue:\n"
+        f"\n"
+        f"Issue: {issue_id}\n"
+        f"Title: {title}\n"
+        f"Type: {issue_type}\n"
+        f"Priority: {priority}\n"
+        f"\n"
+        f"Description:\n"
+        f"{description}\n"
+        f"\n"
+        f"Acceptance Criteria:\n"
+        f"{acceptance_criteria}\n"
+        f"\n"
+        f"Design:\n"
+        f"{design}\n"
+        f"\n"
+        f"Notes:\n"
+        f"{notes}\n"
+        f"\n"
+        f"Solve this issue completely. Follow TDD: write tests from acceptance criteria first, then implement.\n"
+        f'When done: git add -A && git commit -m "<msg>" '
+        f'--trailer "Co-authored-by: {user_name} <{user_email}>"\n'
+        f'Then: bd close {issue_id} --reason "Completed"'
+    )
+
+
+class RalphLoop:
+    """Manages the Ralph autonomous loop for a single project."""
+
+    def __init__(
+        self,
+        project_id: int,
+        project_dir: str,
+        project_name: str,
+        user_github_name: str,
+        user_github_email: str,
+    ) -> None:
+        self.project_id = project_id
+        self.project_dir = project_dir
+        self.project_name = project_name
+        self.status: str = "stopped"
+        self.current_issue_id: Optional[str] = None
+        self.iteration: int = 0
+        self.process: Optional[asyncio.subprocess.Process] = None
+        self.stdout_lines: collections.deque = collections.deque(maxlen=STDOUT_BUFFER_SIZE)
+        self.user_github_name = user_github_name
+        self.user_github_email = user_github_email
+        self._subscribers: set[asyncio.Queue] = set()
+        self._task: Optional[asyncio.Task] = None
+
+    async def start(self) -> None:
+        """Set status to running and kick off the loop task."""
+        self.status = "running"
+        await self._update_db_status("running")
+        self._task = asyncio.create_task(self._loop())
+
+    async def _loop(self) -> None:
+        """Core Ralph loop: pick issue, solve, push, repeat."""
+        try:
+            while self.status == "running":
+                # --- Get ready issues ---
+                proc = await asyncio.create_subprocess_exec(
+                    "bd", "ready", "-n", "1", "--json",
+                    cwd=self.project_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                stdout_bytes, _ = await proc.communicate()
+
+                try:
+                    issues = json.loads(stdout_bytes.decode())
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    issues = []
+
+                # Filter out epics
+                issues = [i for i in issues if i.get("type") != "epic"]
+
+                if not issues:
+                    self.status = "stopped"
+                    await self._update_db_status("idle")
+                    await sse_bus.publish(
+                        self.project_name, "ralph_status",
+                        {"status": "idle", "message": "No more ready issues"},
+                    )
+                    break
+
+                issue = issues[0]
+                self.current_issue_id = issue.get("id", "")
+                self.iteration += 1
+
+                # --- Save state ---
+                self._save_state()
+                await self._update_db_issue()
+
+                # --- Claim ---
+                await asyncio.create_subprocess_exec(
+                    "bd", "update", self.current_issue_id, "--claim",
+                    cwd=self.project_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=self._env({"BD_ACTOR": "ralph"}),
+                )
+
+                # --- Build prompt ---
+                prompt = build_ralph_prompt(
+                    issue, self.user_github_name, self.user_github_email,
+                )
+
+                # --- Run Claude ---
+                self.process = await asyncio.create_subprocess_exec(
+                    "claude", "-p",
+                    "--model", "opus",
+                    "--output-format", "stream-json",
+                    "--verbose",
+                    "--dangerously-skip-permissions",
+                    "--system-prompt", RALPH_SYSTEM_PROMPT,
+                    "--allowedTools", "Bash Read Write Edit Glob Grep WebFetch WebSearch",
+                    prompt,
+                    cwd=self.project_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=self._env({"BD_ACTOR": "ralph"}),
+                )
+
+                # Stream stdout
+                await self._stream_process_output()
+
+                # Wait for exit
+                await self.process.wait()
+                exit_code = self.process.returncode
+
+                if exit_code != 0:
+                    await self._recover(self.current_issue_id)
+                    continue
+
+                # --- Push ---
+                push_proc = await asyncio.create_subprocess_exec(
+                    "git", "push",
+                    cwd=self.project_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await push_proc.wait()
+
+                # --- Check if issue was closed ---
+                check_proc = await asyncio.create_subprocess_exec(
+                    "bd", "show", self.current_issue_id, "--json",
+                    cwd=self.project_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                check_out, _ = await check_proc.communicate()
+                try:
+                    issue_data = json.loads(check_out.decode())
+                    if issue_data.get("status") != "closed":
+                        logger.warning(
+                            "Issue %s was not closed by Ralph after iteration %d",
+                            self.current_issue_id, self.iteration,
+                        )
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    pass
+
+        except Exception:
+            logger.exception("Ralph loop crashed for project %s", self.project_name)
+        finally:
+            if self.status != "stopped":
+                self.status = "stopped"
+                await self._update_db_status("idle")
+
+    async def _recover(self, issue_id: str) -> None:
+        """Reset git state, reopen issue, log crash, and publish event."""
+        logger.warning("Recovering from crash on issue %s", issue_id)
+
+        # git reset --hard HEAD
+        await asyncio.create_subprocess_exec(
+            "git", "reset", "--hard", "HEAD",
+            cwd=self.project_dir,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        # Reopen issue
+        await asyncio.create_subprocess_exec(
+            "bd", "update", issue_id, "--status", "open",
+            cwd=self.project_dir,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        await sse_bus.publish(
+            self.project_name, "ralph_status",
+            {"status": "crash_recovery", "issue_id": issue_id},
+        )
+
+    async def stop(self) -> None:
+        """Gracefully stop after the current iteration finishes."""
+        if self.status != "running":
+            return
+        self.status = "stopping"
+        # If a process is running, wait for it to complete
+        if self.process and self.process.returncode is None:
+            try:
+                await self.process.wait()
+            except Exception:
+                pass
+        # Wait for the task to finish
+        if self._task and not self._task.done():
+            try:
+                await self._task
+            except Exception:
+                pass
+        self.status = "stopped"
+        await self._update_db_status("idle")
+
+    def subscribe(self) -> asyncio.Queue:
+        """Create a new subscriber queue for stdout streaming."""
+        queue: asyncio.Queue = asyncio.Queue(maxsize=200)
+        self._subscribers.add(queue)
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        """Remove a subscriber queue."""
+        self._subscribers.discard(queue)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    async def _stream_process_output(self) -> None:
+        """Read lines from the subprocess stdout and fan out to subscribers."""
+        assert self.process and self.process.stdout
+        while True:
+            line_bytes = await self.process.stdout.readline()
+            if not line_bytes:
+                break
+            line = line_bytes.decode(errors="replace")
+            self.stdout_lines.append(line)
+
+            # Publish to local subscribers
+            for q in self._subscribers.copy():
+                try:
+                    q.put_nowait(line)
+                except asyncio.QueueFull:
+                    pass
+
+            # Publish to SSE bus
+            await sse_bus.publish(
+                self.project_name, "ralph_stdout", {"line": line},
+            )
+
+    def _save_state(self) -> None:
+        """Persist loop state to .ralph_state in the project directory."""
+        state = {
+            "project_id": self.project_id,
+            "status": self.status,
+            "current_issue_id": self.current_issue_id,
+            "iteration": self.iteration,
+        }
+        state_path = Path(self.project_dir) / ".ralph_state"
+        state_path.write_text(json.dumps(state, indent=2))
+
+    async def _update_db_status(self, status: str) -> None:
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE projects SET ralph_loop_status = ? WHERE id = ?",
+                (status, self.project_id),
+            )
+            await db.commit()
+
+    async def _update_db_issue(self) -> None:
+        async with get_db() as db:
+            await db.execute(
+                "UPDATE projects SET ralph_loop_current_issue = ?, ralph_loop_iteration = ? WHERE id = ?",
+                (self.current_issue_id, self.iteration, self.project_id),
+            )
+            await db.commit()
+
+    @staticmethod
+    def _env(extra: dict[str, str]) -> dict[str, str]:
+        """Return a copy of the current environment with extra vars merged in."""
+        import os
+        env = os.environ.copy()
+        env.update(extra)
+        return env
