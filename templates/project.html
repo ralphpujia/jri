@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ project.name }} — Just Ralph It{% endblock %}
+{% block title %}{{ project.name }} | Just Ralph It{% endblock %}
 
 {% block head %}
 <style>
@@ -23,7 +23,7 @@
     }
     .notification-banner.visible { display: flex; }
     .notification-banner button {
-        background: #1a1a1a;
+        background: var(--card-bg);
         color: #e8a820;
         border: none;
         padding: 0.3rem 0.8rem;
@@ -40,32 +40,32 @@
         align-items: center;
         justify-content: space-between;
         padding: 0.7rem 1.5rem;
-        border-bottom: 1px solid #222;
+        border-bottom: 1px solid var(--border-light);
         min-height: 48px;
     }
     .header-left a {
-        color: #e0e0e0;
+        color: var(--text);
         text-decoration: none;
         font-weight: 600;
         font-size: 1.05rem;
     }
-    .header-left a:hover { color: #fff; }
+    .header-left a:hover { color: var(--text-bright); }
     .header-center {
         display: flex;
         align-items: center;
         gap: 0.6rem;
     }
     .header-center .project-name {
-        color: #fff;
+        color: var(--text-bright);
         font-weight: 600;
         font-size: 1.05rem;
     }
     .header-center a.gh-link {
-        color: #888;
+        color: var(--text-dim);
         text-decoration: none;
         font-size: 0.85rem;
     }
-    .header-center a.gh-link:hover { color: #ccc; }
+    .header-center a.gh-link:hover { color: var(--text-muted); }
     .header-right {
         display: flex;
         align-items: center;
@@ -77,15 +77,15 @@
         border-radius: 50%;
     }
     .header-right .username {
-        color: #ccc;
+        color: var(--text-muted);
         font-size: 0.9rem;
     }
     .header-right a {
-        color: #999;
+        color: var(--text-dimmer);
         text-decoration: none;
         font-size: 0.85rem;
     }
-    .header-right a:hover { color: #fff; }
+    .header-right a:hover { color: var(--text-bright); }
 
     /* ── Main layout ── */
     .main-layout {
@@ -98,7 +98,7 @@
         height: calc(100vh - 48px - 38px);
     }
     .divider {
-        background: #222;
+        background: var(--border-light);
     }
 
     /* ── Left panel: Chat ── */
@@ -127,17 +127,17 @@
     }
     .chat-msg.user {
         align-self: flex-end;
-        background: #1a1a1a;
-        border: 1px solid #333;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
     }
     .chat-msg.assistant {
         align-self: flex-start;
-        background: #111;
-        border: 1px solid #222;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-light);
     }
     .chat-msg pre {
-        background: #0a0a0a;
-        border: 1px solid #333;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
         border-radius: 4px;
         padding: 0.5rem;
         overflow-x: auto;
@@ -148,7 +148,7 @@
         font-size: 0.85em;
     }
     .chat-msg p code {
-        background: #0a0a0a;
+        background: var(--code-bg);
         padding: 0.15rem 0.35rem;
         border-radius: 3px;
     }
@@ -157,10 +157,10 @@
         text-decoration: underline;
     }
     .chat-msg p { margin: 0.3rem 0; }
-    .chat-msg strong { color: #fff; }
+    .chat-msg strong { color: var(--text-bright); }
     .thinking-indicator {
         align-self: flex-start;
-        color: #888;
+        color: var(--text-dim);
         font-style: italic;
         font-size: 0.85rem;
         padding: 0.4rem 0;
@@ -170,7 +170,7 @@
 
     /* ── Chat input ── */
     .chat-controls {
-        border-top: 1px solid #222;
+        border-top: 1px solid var(--border-light);
         padding: 0.6rem 1rem;
     }
     .jri-btn-area {
@@ -189,12 +189,12 @@
     }
     .btn-jri {
         background: #e8a820;
-        color: #1a1a1a;
+        color: #1a1a1a; /* intentional: always dark text on accent */
     }
     .btn-jri:hover { opacity: 0.85; }
     .btn-stop {
         background: #ff4444;
-        color: #fff;
+        color: #fff; /* intentional: always white on red */
     }
     .btn-stop:hover { opacity: 0.85; }
     .btn-resume {
@@ -206,19 +206,19 @@
     .chat-input-area {
         display: flex;
         align-items: stretch;
-        border: 1px solid #333;
+        border: 1px solid var(--border);
         border-radius: 6px;
-        background: #1a1a1a;
+        background: var(--input-bg);
         overflow: hidden;
     }
     .chat-input-area:focus-within {
-        border-color: #555;
+        border-color: var(--border-focus);
     }
     .chat-input-area textarea {
         flex: 1;
         background: transparent;
         border: none;
-        color: #e0e0e0;
+        color: var(--text);
         padding: 0.5rem 0.7rem;
         font-family: inherit;
         font-size: 0.9rem;
@@ -235,8 +235,8 @@
     .btn-attach, .btn-send {
         background: none;
         border: none;
-        border-left: 1px solid #333;
-        color: #ccc;
+        border-left: 1px solid var(--border);
+        color: var(--text-muted);
         border-radius: 0;
         padding: 0 0.7rem;
         cursor: pointer;
@@ -246,8 +246,8 @@
         align-items: center;
     }
     .btn-attach:hover, .btn-send:hover {
-        background: #252525;
-        color: #fff;
+        background: var(--hover-bg);
+        color: var(--text-bright);
     }
     .btn-send:disabled, .btn-attach:disabled {
         opacity: 0.4;
@@ -255,7 +255,7 @@
     }
     .attachment-names {
         font-size: 0.8rem;
-        color: #888;
+        color: var(--text-dim);
         padding: 0.2rem 0 0 0;
     }
 
@@ -268,23 +268,23 @@
     }
     .tab-bar {
         display: flex;
-        border-bottom: 1px solid #222;
-        background: #0f0f0f;
+        border-bottom: 1px solid var(--border-light);
+        background: var(--tab-bar-bg);
     }
     .tab-btn {
         padding: 0.55rem 1.2rem;
         background: none;
         border: none;
         border-bottom: 2px solid transparent;
-        color: #888;
+        color: var(--text-dim);
         cursor: pointer;
         font-size: 0.85rem;
         font-weight: 500;
         transition: color 0.15s, border-color 0.15s;
     }
-    .tab-btn:hover { color: #ccc; }
+    .tab-btn:hover { color: var(--text-muted); }
     .tab-btn.active {
-        color: #e0e0e0;
+        color: var(--text);
         border-bottom-color: #e8a820;
     }
     .tab-content {
@@ -312,7 +312,7 @@
         font-weight: 600;
         font-size: 0.95rem;
         padding: 0.4rem 0;
-        border-bottom: 1px solid #1a1a1a;
+        border-bottom: 1px solid var(--card-bg);
         margin-bottom: 0.4rem;
     }
     .status-dot {
@@ -324,8 +324,8 @@
     }
     .status-dot.closed { background: #4caf50; }
     .status-dot.in_progress { background: #e8a820; }
-    .status-dot.open { background: #888; }
-    .status-dot.deferred { background: #555; opacity: 0.6; }
+    .status-dot.open { background: var(--text-dim); }
+    .status-dot.deferred { background: var(--border-focus); opacity: 0.6; }
     .issue-row {
         display: flex;
         align-items: center;
@@ -335,22 +335,22 @@
         cursor: pointer;
         font-size: 0.85rem;
     }
-    .issue-row:hover { background: #1a1a1a; }
+    .issue-row:hover { background: var(--card-bg); }
     .issue-id {
-        color: #666;
+        color: var(--text-faint);
         font-size: 0.75rem;
         min-width: 50px;
     }
     .issue-title {
         flex: 1;
-        color: #ccc;
+        color: var(--text-muted);
     }
     .issue-badge {
         font-size: 0.7rem;
         padding: 0.1rem 0.4rem;
         border-radius: 3px;
-        background: #222;
-        color: #aaa;
+        background: var(--badge-bg);
+        color: var(--text-dimmer);
     }
     .issue-priority {
         font-size: 0.7rem;
@@ -361,13 +361,13 @@
         display: none;
         padding: 0.5rem 0.5rem 0.5rem 1.5rem;
         font-size: 0.82rem;
-        color: #999;
+        color: var(--text-dimmer);
         line-height: 1.5;
-        border-left: 2px solid #333;
+        border-left: 2px solid var(--border);
         margin: 0.2rem 0 0.4rem 0.8rem;
     }
     .issue-detail.expanded { display: block; }
-    .issue-detail strong { color: #bbb; }
+    .issue-detail strong { color: var(--text-muted); }
 
     /* ── AGENTS.md tab ── */
     .agents-md-content {
@@ -375,7 +375,7 @@
         font-size: 0.9rem;
     }
     .agents-md-content h1, .agents-md-content h2, .agents-md-content h3 {
-        color: #fff;
+        color: var(--text-bright);
         margin: 1rem 0 0.4rem;
     }
     .agents-md-content h1 { font-size: 1.3rem; }
@@ -383,15 +383,15 @@
     .agents-md-content h3 { font-size: 0.95rem; }
     .agents-md-content p { margin: 0.3rem 0; }
     .agents-md-content code {
-        background: #0a0a0a;
+        background: var(--code-bg);
         padding: 0.15rem 0.35rem;
         border-radius: 3px;
         font-family: 'SF Mono', 'Fira Code', monospace;
         font-size: 0.85em;
     }
     .agents-md-content pre {
-        background: #0a0a0a;
-        border: 1px solid #333;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
         border-radius: 4px;
         padding: 0.5rem;
         overflow-x: auto;
@@ -403,7 +403,7 @@
         margin: 0.3rem 0;
     }
     .agents-md-placeholder {
-        color: #666;
+        color: var(--text-faint);
         font-style: italic;
         margin-top: 2rem;
         text-align: center;
@@ -411,14 +411,14 @@
 
     /* ── Ralph tab ── */
     .ralph-terminal {
-        background: #111;
+        background: var(--bg-secondary);
         font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
         font-size: 0.8rem;
         line-height: 1.4;
         padding: 0.8rem;
         white-space: pre-wrap;
         word-break: break-all;
-        color: #aaa;
+        color: var(--text-dimmer);
         height: 100%;
         overflow-y: auto;
     }
@@ -443,14 +443,14 @@
     }
     .btn-upload {
         padding: 0.4rem 1rem;
-        background: #1a1a1a;
-        border: 1px solid #333;
-        color: #ccc;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
         border-radius: 4px;
         cursor: pointer;
         font-size: 0.85rem;
     }
-    .btn-upload:hover { border-color: #555; color: #fff; }
+    .btn-upload:hover { border-color: var(--border-focus); color: var(--text-bright); }
     .upload-list {
         display: flex;
         flex-direction: column;
@@ -461,18 +461,18 @@
         align-items: center;
         gap: 0.7rem;
         padding: 0.4rem 0.6rem;
-        background: #1a1a1a;
+        background: var(--card-bg);
         border-radius: 4px;
         font-size: 0.85rem;
     }
     .upload-item .file-name {
         flex: 1;
-        color: #ccc;
+        color: var(--text-muted);
         cursor: pointer;
     }
-    .upload-item .file-name:hover { color: #fff; }
+    .upload-item .file-name:hover { color: var(--text-bright); }
     .upload-item .file-meta {
-        color: #666;
+        color: var(--text-faint);
         font-size: 0.78rem;
         white-space: nowrap;
     }
@@ -486,9 +486,9 @@
     }
     .upload-item button:hover { color: #ff6666; }
     .upload-item input.rename-input {
-        background: #111;
-        border: 1px solid #555;
-        color: #e0e0e0;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-focus);
+        color: var(--text);
         padding: 0.15rem 0.4rem;
         border-radius: 3px;
         font-size: 0.85rem;
@@ -513,7 +513,7 @@
         display: flex;
     }
     .uploads-empty {
-        color: #666;
+        color: var(--text-faint);
         font-style: italic;
         text-align: center;
         margin-top: 2rem;
@@ -546,8 +546,8 @@
     /* Scrollbar styling */
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-    ::-webkit-scrollbar-thumb:hover { background: #555; }
+    ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 </style>
 {% endblock %}
 
@@ -1012,7 +1012,7 @@
         container.innerHTML = '';
 
         if ((!data.epics || data.epics.length === 0) && (!data.ungrouped || data.ungrouped.length === 0)) {
-            container.innerHTML = '<p style="color:#666;font-style:italic;text-align:center;margin-top:2rem;">No issues yet. Chat with Ralphy to create your project plan.</p>';
+            container.innerHTML = '<p style="color:var(--text-faint);font-style:italic;text-align:center;margin-top:2rem;">No issues yet. Chat with Ralphy to create your project plan.</p>';
             return;
         }
 

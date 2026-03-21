@@ -23,14 +23,14 @@
         font-size: 1.1rem;
         line-height: 1.6;
         margin-bottom: 2rem;
-        color: #e0e0e0;
+        color: var(--text);
     }
     .btn-github {
         display: inline-block;
         padding: 0.75rem 1.5rem;
-        border: 1px solid #e0e0e0;
+        border: 1px solid var(--text);
         background: transparent;
-        color: #fff;
+        color: var(--text-bright);
         font-size: 1rem;
         text-decoration: none;
         border-radius: 4px;
@@ -38,7 +38,7 @@
         transition: background-color 0.2s;
     }
     .btn-github:hover {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: var(--hover-bg);
     }
 </style>
 {% endblock %}
@@ -46,7 +46,7 @@
 {% block content %}
 <div class="landing-container">
     <h1>Just Ralph It</h1>
-    <p>Tool to transform your software idea into a very detailed plan and let an AI agent build it entirely.</p>
+    <p>Transform your software idea into a very detailed plan and let an AI agent build it entirely.</p>
     <a href="/auth/login" class="btn-github">Sign in with GitHub</a>
 </div>
 {% endblock %}

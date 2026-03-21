@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard — Just Ralph It{% endblock %}
+{% block title %}Dashboard | Just Ralph It{% endblock %}
 
 {% block head %}
 <style>
@@ -9,16 +9,16 @@
         justify-content: space-between;
         align-items: center;
         padding: 1rem 2rem;
-        border-bottom: 1px solid #222;
+        border-bottom: 1px solid var(--border-light);
     }
     nav a.brand {
-        color: #e0e0e0;
+        color: var(--text);
         text-decoration: none;
         font-weight: 600;
         font-size: 1.1rem;
     }
     nav a.brand:hover {
-        color: #fff;
+        color: var(--text-bright);
     }
     .nav-right {
         display: flex;
@@ -31,16 +31,16 @@
         border-radius: 50%;
     }
     .nav-right .username {
-        color: #ccc;
+        color: var(--text-muted);
         font-size: 0.95rem;
     }
     .nav-right a {
-        color: #999;
+        color: var(--text-dimmer);
         text-decoration: none;
         font-size: 0.9rem;
     }
     .nav-right a:hover {
-        color: #fff;
+        color: var(--text-bright);
     }
     .container {
         max-width: 800px;
@@ -59,9 +59,9 @@
     .btn {
         display: inline-block;
         padding: 0.6rem 1.2rem;
-        border: 1px solid #e0e0e0;
+        border: 1px solid var(--text);
         background: transparent;
-        color: #fff;
+        color: var(--text-bright);
         font-size: 0.95rem;
         border-radius: 4px;
         cursor: pointer;
@@ -69,7 +69,7 @@
         transition: background-color 0.2s;
     }
     .btn:hover {
-        background-color: rgba(255, 255, 255, 0.1);
+        background-color: var(--hover-bg);
     }
     .project-list {
         display: flex;
@@ -77,8 +77,8 @@
         gap: 1rem;
     }
     .project-card {
-        background: #1a1a1a;
-        border: 1px solid #222;
+        background: var(--card-bg);
+        border: 1px solid var(--border-light);
         border-radius: 6px;
         padding: 1.2rem 1.5rem;
         display: flex;
@@ -91,27 +91,27 @@
         gap: 0.3rem;
     }
     .project-info a.project-name {
-        color: #e0e0e0;
+        color: var(--text);
         text-decoration: none;
         font-weight: 600;
         font-size: 1.1rem;
     }
     .project-info a.project-name:hover {
-        color: #fff;
+        color: var(--text-bright);
     }
     .project-meta {
         display: flex;
         align-items: center;
         gap: 1rem;
         font-size: 0.85rem;
-        color: #888;
+        color: var(--text-dim);
     }
     .project-meta a {
-        color: #888;
+        color: var(--text-dim);
         text-decoration: none;
     }
     .project-meta a:hover {
-        color: #ccc;
+        color: var(--text-muted);
     }
     .project-actions {
         display: flex;
@@ -131,11 +131,55 @@
     .empty-state {
         text-align: center;
         margin-top: 4rem;
-        color: #888;
+        color: var(--text-dim);
     }
     .empty-state p {
         margin-bottom: 1.5rem;
         font-size: 1.1rem;
+    }
+    /* Shimmer loading skeleton */
+    .shimmer-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border-light);
+        border-radius: 6px;
+        padding: 1.2rem 1.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .shimmer-bar {
+        background: var(--border-light);
+        border-radius: 4px;
+        position: relative;
+        overflow: hidden;
+    }
+    .shimmer-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, transparent, var(--hover-bg), transparent);
+        animation: shimmer 1.5s infinite;
+    }
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+    .shimmer-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .shimmer-title {
+        width: 180px;
+        height: 18px;
+    }
+    .shimmer-meta {
+        width: 120px;
+        height: 14px;
+    }
+    .shimmer-action {
+        width: 50px;
+        height: 16px;
     }
 </style>
 {% endblock %}
@@ -154,7 +198,11 @@
         <h2>Your Projects</h2>
         <a href="/new" class="btn">New Project</a>
     </div>
-    <div id="project-list" class="project-list"></div>
+    <div id="project-list" class="project-list">
+        <div class="shimmer-card"><div class="shimmer-info"><div class="shimmer-bar shimmer-title"></div><div class="shimmer-bar shimmer-meta"></div></div><div class="shimmer-bar shimmer-action"></div></div>
+        <div class="shimmer-card"><div class="shimmer-info"><div class="shimmer-bar shimmer-title"></div><div class="shimmer-bar shimmer-meta"></div></div><div class="shimmer-bar shimmer-action"></div></div>
+        <div class="shimmer-card"><div class="shimmer-info"><div class="shimmer-bar shimmer-title"></div><div class="shimmer-bar shimmer-meta"></div></div><div class="shimmer-bar shimmer-action"></div></div>
+    </div>
     <div id="empty-state" class="empty-state" style="display:none;">
         <p>No projects yet.</p>
     </div>
@@ -196,7 +244,7 @@
                 ghLink.href = p.github_repo_url;
                 ghLink.target = '_blank';
                 ghLink.rel = 'noopener noreferrer';
-                ghLink.textContent = 'GitHub';
+                ghLink.textContent = 'GitHub \u2197';
                 meta.appendChild(ghLink);
             }
             info.appendChild(meta);
