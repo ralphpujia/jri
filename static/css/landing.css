@@ -9,8 +9,8 @@ body.landing {
     --landing-text: #e0e0e0;
     --landing-text-bright: #fff;
     --landing-text-muted: #666;
-    --landing-green: #00FF41;
-    --landing-green-hover: #00cc33;
+    --landing-accent: #FFD700;
+    --landing-accent-hover: #e6c200;
     --landing-red: #FF0033;
     --landing-border: #333;
     --landing-font: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
@@ -20,19 +20,6 @@ body.landing {
     background-color: var(--landing-bg);
     color: var(--landing-text);
     font-family: var(--landing-font);
-}
-
-/* -- Light mode (toggled via JS) ----------------------------------------- */
-body.landing.light {
-    --landing-bg: #f5f5f0;
-    --landing-card-bg: #ffffff;
-    --landing-text: #1a1a1a;
-    --landing-text-bright: #000;
-    --landing-text-muted: #666;
-    --landing-green: #006b1f;
-    --landing-green-hover: #005518;
-    --landing-red: #cc0029;
-    --landing-border: #ccc;
 }
 
 /* ==========================================================================
@@ -53,15 +40,8 @@ body.landing.light {
    ========================================================================== */
 .landing-grid-bg {
     background-image:
-        linear-gradient(rgba(0, 255, 65, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 255, 65, 0.04) 1px, transparent 1px);
-    background-size: 20px 20px;
-}
-
-body.landing.light .landing-grid-bg {
-    background-image:
-        linear-gradient(rgba(0, 107, 31, 0.06) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 107, 31, 0.06) 1px, transparent 1px);
+        linear-gradient(rgba(255, 215, 0, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 215, 0, 0.04) 1px, transparent 1px);
     background-size: 20px 20px;
 }
 
@@ -79,21 +59,11 @@ body.landing.light .landing-grid-bg {
         0deg,
         transparent,
         transparent 2px,
-        rgba(0, 255, 65, 0.03) 2px,
-        rgba(0, 255, 65, 0.03) 4px
+        rgba(255, 215, 0, 0.03) 2px,
+        rgba(255, 215, 0, 0.03) 4px
     );
     pointer-events: none;
     z-index: 50;
-}
-
-body.landing.light .landing-scanline::after {
-    background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0, 107, 31, 0.02) 2px,
-        rgba(0, 107, 31, 0.02) 4px
-    );
 }
 
 /* ==========================================================================
@@ -113,34 +83,12 @@ body.landing.light .landing-scanline::after {
 }
 
 /* ==========================================================================
-   Theme toggle button
-   ========================================================================== */
-.theme-toggle {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    z-index: 20;
-    background: none;
-    border: none;
-    color: var(--landing-green);
-    font-size: 1.25rem;
-    cursor: pointer;
-    padding: 0.5rem;
-    line-height: 1;
-    transition: opacity 0.2s;
-}
-
-.theme-toggle:hover {
-    opacity: 0.7;
-}
-
-/* ==========================================================================
    Central card
    ========================================================================== */
 .landing-card {
     position: relative;
     z-index: 10;
-    border: 2px solid var(--landing-green);
+    border: 2px solid var(--landing-accent);
     background-color: var(--landing-card-bg);
     padding: 2.5rem;
     display: flex;
@@ -182,7 +130,7 @@ body.landing.light .landing-scanline::after {
     position: absolute;
     width: 12px;
     height: 12px;
-    border-color: var(--landing-green);
+    border-color: var(--landing-accent);
     border-style: solid;
 }
 
@@ -222,9 +170,9 @@ body.landing.light .landing-scanline::after {
     font-family: var(--landing-font);
 }
 
-/* Subtitle (green, small caps) */
+/* Subtitle (accent color, small caps) */
 .landing-subtitle {
-    color: var(--landing-green);
+    color: var(--landing-accent);
     font-size: 0.875rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -243,14 +191,10 @@ body.landing.light .landing-scanline::after {
 }
 
 /* ==========================================================================
-   Terminal glow (green text-shadow)
+   Terminal glow (yellow text-shadow)
    ========================================================================== */
 .terminal-glow {
-    text-shadow: 0 0 6px rgba(0, 255, 65, 0.4);
-}
-
-body.landing.light .terminal-glow {
-    text-shadow: 0 0 6px rgba(0, 107, 31, 0.25);
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
 }
 
 /* ==========================================================================
@@ -292,9 +236,9 @@ body.landing.light .terminal-glow {
     display: block;
     width: 100%;
     padding: 0.75rem 1rem;
-    border: 2px solid var(--landing-green);
+    border: 2px solid var(--landing-accent);
     background: transparent;
-    color: var(--landing-green);
+    color: var(--landing-accent);
     font-size: 0.875rem;
     font-weight: 700;
     font-family: var(--landing-font);
@@ -308,7 +252,7 @@ body.landing.light .terminal-glow {
 }
 
 .btn-login:hover {
-    background-color: var(--landing-green);
+    background-color: var(--landing-accent);
     color: var(--landing-bg);
 }
 
