@@ -1144,7 +1144,15 @@
                                 var label = evt.name || 'Working...';
                                 thinkingSteps.push(label);
                                 // Refresh issues when Ralphy uses Bash (likely bd commands)
-                                if (evt.name === 'Bash') { fetchIssues(); fetchAgentsMd(); }
+                                if (evt.name === 'Bash') {
+                                    fetchIssues(); fetchAgentsMd();
+                                    // Detect bd update --status open → show JRI button
+                                    var cmd = (evt.input && evt.input.command) || '';
+                                    if (/bd\s+update\b.*--status\s+open/.test(cmd)) {
+                                        showJriButton();
+                                        localStorage.setItem(STORAGE_KEY + '-jri', 'true');
+                                    }
+                                }
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
@@ -1193,13 +1201,8 @@
        JRI / STOP / RESUME BUTTONS
        ══════════════════════════════════════════════ */
     function checkJriVisibility(responseText) {
-        if (responseText && /just ralph it/i.test(responseText)) {
-            // Don't re-add if one already exists in the chat area
-            if (document.querySelector('.jri-msg')) return;
-            localStorage.setItem(STORAGE_KEY + '-jri', 'true');
-            showJriButton();
-        }
-        // Always refresh project state for stop/resume buttons
+        // JRI button is triggered by bd update --status open tool_use events,
+        // not by text regex. Just refresh project state for stop/resume buttons.
         refreshProject();
     }
 
@@ -1817,15 +1820,9 @@
             addChatMessage(msg.role, renderMarkdown(msg.content));
         });
 
-        // 1b. Restore JRI button if it was showing before refresh,
-        // or if any restored message mentions "just ralph it"
+        // 1b. Restore JRI button if flag was set (by bd update --status open detection)
         if (localStorage.getItem(STORAGE_KEY + '-jri') === 'true') {
             showJriButton();
-        } else {
-            var hasJriMention = history.some(function(msg) {
-                return msg.role === 'assistant' && /just ralph it/i.test(msg.content);
-            });
-            if (hasJriMention) showJriButton();
         }
 
         scrollChat();
