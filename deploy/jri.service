@@ -1,12 +1,13 @@
 [Unit]
 Description=Just Ralph It
 After=network.target
+Requires=jri.socket
 
 [Service]
 Type=simple
 User=nico
 WorkingDirectory=/home/nico/jri
-ExecStart=/usr/bin/python3 -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+ExecStart=/usr/bin/python3 deploy/sd_boot.py
 Restart=always
 RestartSec=2
 TimeoutStopSec=5
