@@ -1370,12 +1370,6 @@
                                 // Refresh issues when Ralphy uses Bash (likely bd commands)
                                 if (evt.name === 'Bash') {
                                     fetchIssues(); fetchAgentsMd();
-                                    // Detect bd update --status open → show JRI button
-                                    var cmd = (evt.input && evt.input.command) || '';
-                                    if (/bd\s+update\b.*--status\s+open/.test(cmd)) {
-                                        showJriButton();
-                                        localStorage.setItem(STORAGE_KEY + '-jri', 'true');
-                                    }
                                 }
                                 ensureMsgDiv();
                                 rebuildMsg();
@@ -1598,18 +1592,19 @@
     /* ══════════════════════════════════════════════
        ISSUES TAB
        ══════════════════════════════════════════════ */
-    function hasOpenIssues(data) {
+    function allIssuesReady(data) {
         if (!data) return false;
-        var found = false;
+        var hasOpen = false;
+        var hasDeferred = false;
+        function check(c) {
+            if (c.status === 'open') hasOpen = true;
+            if (c.status === 'deferred') hasDeferred = true;
+        }
         (data.epics || []).forEach(function(e) {
-            (e.children || []).forEach(function(c) {
-                if (c.status === 'open' || c.status === 'deferred') found = true;
-            });
+            (e.children || []).forEach(check);
         });
-        (data.ungrouped || []).forEach(function(c) {
-            if (c.status === 'open' || c.status === 'deferred') found = true;
-        });
-        return found;
+        (data.ungrouped || []).forEach(check);
+        return hasOpen && !hasDeferred;
     }
 
     function fetchIssues() {
@@ -1618,7 +1613,12 @@
             .then(function(data) {
                 issuesData = data;
                 renderIssues(data);
-                if (hasOpenIssues(data)) showJriButton();
+                if (allIssuesReady(data)) {
+                    showJriButton();
+                    localStorage.setItem(STORAGE_KEY + '-jri', 'true');
+                } else {
+                    localStorage.removeItem(STORAGE_KEY + '-jri');
+                }
             })
             .catch(function() {});
     }
