@@ -8,7 +8,180 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/css/landing.css">
+<style>
+body.landing {
+    --landing-bg: #000000;
+    --landing-card-bg: #0a0a0a;
+    --landing-text: #e0e0e0;
+    --landing-text-bright: #fff;
+    --landing-text-muted: #666;
+    --landing-accent: #FFD700;
+    --landing-accent-hover: #e6c200;
+    --landing-border: #333;
+    --landing-font: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    margin: 0;
+    padding: 0;
+    background-color: var(--landing-bg);
+    color: var(--landing-text);
+    font-family: var(--landing-font);
+}
+@media (prefers-color-scheme: light) {
+    body.landing {
+        --landing-bg: #fafafa;
+        --landing-card-bg: #ffffff;
+        --landing-text: #1a1a1a;
+        --landing-text-bright: #000;
+        --landing-text-muted: #666;
+        --landing-accent: #d4a800;
+        --landing-accent-hover: #b89200;
+        --landing-border: #ddd;
+    }
+}
+.landing-fullscreen {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: var(--landing-bg);
+}
+.landing-grid-bg {
+    background-image:
+        linear-gradient(rgba(255, 215, 0, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 215, 0, 0.04) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+.landing-scanline::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(255, 215, 0, 0.03) 2px, rgba(255, 215, 0, 0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 50;
+}
+.bouncing-logo {
+    position: absolute;
+    top: 0; left: 0;
+    width: 720px;
+    height: auto;
+    object-fit: contain;
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: 5;
+    will-change: transform;
+}
+.landing-card {
+    position: relative;
+    z-index: 10;
+    border: 2px solid var(--landing-accent);
+    background-color: var(--landing-card-bg);
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    text-align: center;
+    min-width: 340px;
+    max-width: 40rem;
+    overflow: hidden;
+}
+.title-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+.bracket-wrapper {
+    position: relative;
+    padding: 0.75rem 1.25rem;
+}
+.bracket-corner {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-color: var(--landing-accent);
+    border-style: solid;
+}
+.bracket-tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.bracket-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.bracket-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.bracket-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+.landing-title {
+    font-size: clamp(1.5rem, 5vw, 3rem);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--landing-text-bright);
+    margin: 0;
+    padding: 0 0.5rem;
+    font-family: var(--landing-font);
+    word-break: break-word;
+}
+.landing-subtitle {
+    color: var(--landing-accent);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+    font-family: var(--landing-font);
+}
+.landing-tagline {
+    color: var(--landing-text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+    font-family: var(--landing-font);
+}
+.terminal-glow {
+    text-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+}
+@keyframes glitch {
+    0%, 100% { transform: translate(0); }
+    20% { transform: translate(-2px, 1px) skewX(-1deg); }
+    40% { transform: translate(1px, -1px); }
+    60% { transform: translate(-1px, 0) skewX(1deg); }
+    80% { transform: translate(2px, 1px); }
+}
+.glitch-text:hover { animation: glitch 0.3s ease-in-out; }
+.landing-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+.btn-login {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--landing-accent);
+    background: transparent;
+    color: var(--landing-accent);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-family: var(--landing-font);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    box-sizing: border-box;
+}
+.btn-login:hover {
+    background-color: var(--landing-accent);
+    color: var(--landing-bg);
+}
+@media (max-width: 640px) {
+    .bouncing-logo { display: none; }
+    .landing-card { min-width: 0; margin: 1rem; padding: 1.5rem; }
+    .landing-subtitle { font-size: 0.75rem; }
+    .landing-tagline { font-size: 0.625rem; }
+}
+</style>
 {% endblock %}
 
 {% block content %}
@@ -33,7 +206,7 @@
                 <h1 class="landing-title glitch-text terminal-glow">JUSTRALPH.IT</h1>
             </div>
             <p class="landing-subtitle">FROM IDEA TO CODE</p>
-            <p class="landing-tagline">DESCRIBE YOUR PROJECT. RALPH BUILDS IT.</p>
+            <p class="landing-tagline">DESCRIBE YOUR PROJECT.<br>RALPH BUILDS IT.</p>
         </div>
 
         <!-- Actions -->
@@ -43,5 +216,33 @@
     </div>
 </div>
 
-<script src="/static/js/landing.js"></script>
+<script>
+(function () {
+    var SPEED = 1.2;
+    var IMG_SIZE = 720;
+    var container = document.getElementById('bouncing-logo-container');
+    var img = document.getElementById('bouncing-logo');
+    if (!container || !img) return;
+    var x = 0, y = 0, dx = SPEED, dy = SPEED, initialized = false;
+    function tick() {
+        var imgHeight = img.naturalHeight ? (IMG_SIZE / img.naturalWidth) * img.naturalHeight : IMG_SIZE;
+        var maxX = window.innerWidth - IMG_SIZE;
+        var maxY = window.innerHeight - imgHeight;
+        if (!initialized) {
+            x = Math.random() * Math.max(0, maxX);
+            y = Math.random() * Math.max(0, maxY);
+            dx = (Math.random() > 0.5 ? 1 : -1) * SPEED;
+            dy = (Math.random() > 0.5 ? 1 : -1) * SPEED;
+            initialized = true;
+        }
+        x += dx; y += dy;
+        if (x <= 0 || x >= maxX) { dx *= -1; x = Math.max(0, Math.min(x, maxX)); }
+        if (y <= 0 || y >= maxY) { dy *= -1; y = Math.max(0, Math.min(y, maxY)); }
+        img.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+        requestAnimationFrame(tick);
+    }
+    if (img.complete) requestAnimationFrame(tick);
+    else img.addEventListener('load', function() { requestAnimationFrame(tick); });
+})();
+</script>
 {% endblock %}
