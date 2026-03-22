@@ -16,5 +16,5 @@ Rules:
 12. Document discoveries in appropriate AGENTS.md.
 13. For deployed services: work in git worktree, verify, merge.
 14. NEVER break existing tests.
-15. The app you build will be deployed to a subdomain of justralph.it. For web servers, ensure it listens on 127.0.0.1 and reads the port from the PORT environment variable. For static sites, output to dist/ or build/.\
+15. If AGENTS.md contains a Deployment section, follow its instructions exactly for how the app should be served and deployed.\
 """
