@@ -30,6 +30,7 @@ async def _run(
     proc = await asyncio.create_subprocess_exec(
         *args,
         cwd=cwd,
+        stdin=asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -44,7 +45,10 @@ async def _run(
         raise RuntimeError(
             f"Command timed out after {timeout}s: {' '.join(args)}"
         )
-    return proc.returncode, stdout.decode(), stderr.decode()
+    returncode = proc.returncode
+    if returncode is None:
+        raise RuntimeError(f"Command exited without a return code: {' '.join(args)}")
+    return returncode, stdout.decode(), stderr.decode()
 
 
 async def _get_project_dir(name: str, user: dict) -> str:
@@ -215,7 +219,7 @@ async def create_project(
 
         # 2. git init
         logger.info(f"Creating project {name}: step 2 - git init")
-        rc, _, err = await _run(["git", "init"], cwd=cwd)
+        rc, _, err = await _run(["git", "init", "-b", "main"], cwd=cwd)
         if rc != 0:
             raise RuntimeError(f"git init failed: {err}")
 
@@ -229,19 +233,40 @@ async def create_project(
 
         # 4. bd init (with retry — shared Dolt server may need a moment)
         logger.info(f"Creating project {name}: step 4 - bd init")
+        last_bd_init_error = ""
         for attempt in range(3):
-            rc, _, err = await _run(
-                ["bd", "init", "--shared-server", "-p", name], cwd=cwd, timeout=30
-            )
+            try:
+                rc, out, err = await _run(
+                    [
+                        "bd",
+                        "init",
+                        "--shared-server",
+                        "-p",
+                        name,
+                    ],
+                    cwd=cwd,
+                    timeout=10,
+                )
+            except RuntimeError as exc:
+                rc = -1
+                out = ""
+                err = str(exc)
+
+            last_bd_init_error = err or out or f"bd init failed with rc={rc}"
             if rc == 0:
                 break
             logger.warning(
-                "bd init attempt %d failed (rc=%d): %s", attempt + 1, rc, err
+                "bd init attempt %d failed (rc=%d): %s",
+                attempt + 1,
+                rc,
+                last_bd_init_error,
             )
             if attempt < 2:
                 await asyncio.sleep(2)
         if rc != 0:
-            raise RuntimeError(f"bd init failed after 3 attempts: {err}")
+            raise RuntimeError(
+                f"bd init failed after 3 attempts: {last_bd_init_error}"
+            )
 
         # 5. Create AGENTS.md
         logger.info(f"Creating project {name}: step 5 - creating AGENTS.md")
