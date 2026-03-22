@@ -1230,7 +1230,8 @@
                 var decoder = new TextDecoder();
                 var buffer = '';
                 var msgDiv = null;
-                var fullText = '';
+                var initialText = '';
+                var finalText = '';
                 var thinkingSteps = [];
                 var thinkingText = '';
                 var thinkingComplete = false;
@@ -1238,7 +1239,8 @@
                     var pending = {
                         thinkingText: thinkingText,
                         thinkingSteps: thinkingSteps,
-                        fullText: fullText,
+                        initialText: initialText,
+                        finalText: finalText,
                         thinkingComplete: thinkingComplete
                     };
                     try { localStorage.setItem(STORAGE_KEY + '-pending', JSON.stringify(pending)); } catch(e) {}
@@ -1252,6 +1254,11 @@
                     return thinkingComplete ? 'Finished thinking' : 'Thinking...';
                 }
 
+                function getCombinedAssistantText() {
+                    if (initialText && finalText) return initialText + '\n\n' + finalText;
+                    return initialText || finalText;
+                }
+
                 function rebuildMsg() {
                     if (!msgDiv) return;
                     savePendingMessage();
@@ -1259,6 +1266,9 @@
                     var existingDetails = msgDiv.querySelector('details.thinking');
                     var wasOpen = existingDetails ? existingDetails.open : true;
                     var html = '';
+                    if (initialText) {
+                        html += '<div class="message-text">' + renderMarkdown(initialText) + '</div>';
+                    }
                     if (hasThinkingContent()) {
                         html += '<div class="thinking-content">';
                         html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>' + getThinkingSummary() + '</summary>';
@@ -1272,8 +1282,8 @@
                         }
                         html += '</div></details>';
                     }
-                    if (fullText && (!hasThinkingContent() || thinkingComplete)) {
-                        html += '<div class="message-text">' + renderMarkdown(fullText) + '</div>';
+                    if (finalText && (!hasThinkingContent() || thinkingComplete)) {
+                        html += '<div class="message-text">' + renderMarkdown(finalText) + '</div>';
                     }
                     msgDiv.innerHTML = html;
                 }
@@ -1290,9 +1300,10 @@
                     return reader.read().then(function(result) {
                         if (result.done) {
                             localStorage.removeItem(STORAGE_KEY + '-pending');
-                            if (fullText) appendToHistory('assistant', fullText);
+                            var combinedText = getCombinedAssistantText();
+                            if (combinedText) appendToHistory('assistant', combinedText);
                             setProcessing(false);
-                            checkJriVisibility(fullText);
+                            checkJriVisibility(combinedText);
                             return;
                         }
                         buffer += decoder.decode(result.value, { stream: true });
@@ -1330,8 +1341,10 @@
                             } else if (evt.type === 'text') {
                                 if (hasThinkingContent()) {
                                     thinkingComplete = true;
+                                    finalText += evt.content;
+                                } else {
+                                    initialText += evt.content;
                                 }
-                                fullText += evt.content;
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
@@ -1339,10 +1352,10 @@
                                 if (hasThinkingContent()) {
                                     thinkingComplete = true;
                                 }
-                                // Prefer the final result only when it cleanly extends the streamed text,
+                                // Prefer the final result only when it cleanly extends the streamed final text,
                                 // so we do not replace the visible answer with a different duplicate payload.
-                                if (evt.result && (!fullText || (evt.result.length > fullText.length && evt.result.indexOf(fullText) === 0))) {
-                                    fullText = evt.result;
+                                if (evt.result && (!finalText || (evt.result.length > finalText.length && evt.result.indexOf(finalText) === 0))) {
+                                    finalText = evt.result;
                                 }
                                 localStorage.removeItem(STORAGE_KEY + '-pending');
                                 ensureMsgDiv();
@@ -2145,9 +2158,29 @@
         if (pendingRaw) {
             try {
                 var pending = JSON.parse(pendingRaw);
-                if (pending.fullText) {
-                    appendToHistory('assistant', pending.fullText);
-                    addChatMessage('assistant', renderMarkdown(pending.fullText));
+                var restoredParts = [];
+                if (pending.initialText) {
+                    restoredParts.push('<div class="message-text">' + renderMarkdown(pending.initialText) + '</div>');
+                }
+                if (pending.thinkingText || (pending.thinkingSteps && pending.thinkingSteps.length > 0)) {
+                    restoredParts.push('<div class="thinking-content"><details class="thinking" open><summary>' +
+                        (pending.thinkingComplete ? 'Finished thinking' : 'Thinking...') +
+                        '</summary>');
+                    if (pending.thinkingText) {
+                        restoredParts.push('<div>' + escapeHtml(pending.thinkingText) + '</div>');
+                    }
+                    if (pending.thinkingSteps && pending.thinkingSteps.length > 0) {
+                        pending.thinkingSteps.forEach(function(step) {
+                            restoredParts.push('<div>Tool: ' + escapeHtml(step) + '</div>');
+                        });
+                    }
+                    restoredParts.push('</details></div>');
+                }
+                if (pending.finalText) {
+                    restoredParts.push('<div class="message-text">' + renderMarkdown(pending.finalText) + '</div>');
+                }
+                if (restoredParts.length > 0) {
+                    addChatMessage('assistant', restoredParts.join(''));
                 }
                 localStorage.removeItem(STORAGE_KEY + '-pending');
             } catch(e) {}
