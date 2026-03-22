@@ -65,6 +65,7 @@ MultiPartParser.max_file_size = 1024 * 1024 * 10  # 10MB
 
 # Mount static files
 _static_dir = Path(__file__).resolve().parent.parent / "static"
+_static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")
 
 # Include routers
