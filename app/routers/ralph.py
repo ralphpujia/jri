@@ -154,13 +154,21 @@ async def ralph_start(name: str, user: dict = Depends(get_current_user)):
 @router.post("/{name}/ralph/stop")
 async def ralph_stop(name: str, user: dict = Depends(get_current_user)):
     """Gracefully stop the Ralph loop after the current iteration."""
-    await _get_project(name, user)
+    project = await _get_project(name, user)
 
     loop = _loops.get(name)
-    if loop is None:
-        raise HTTPException(status_code=404, detail="No active Ralph loop")
+    if loop is not None:
+        await loop.stop()
+        return {"status": "stopped"}
 
-    await loop.stop()
+    # No in-memory loop — DB may be stale (e.g., after service restart).
+    # Reset DB status to idle.
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE projects SET ralph_loop_status = 'idle' WHERE id = ?",
+            (project["id"],),
+        )
+        await db.commit()
     return {"status": "stopped"}
 
 
@@ -243,15 +251,26 @@ async def ralph_status(name: str, user: dict = Depends(get_current_user)):
 
     loop = _loops.get(name)
     if loop is None:
-        # Try to read persisted stdout
+        # No in-memory loop — DB may say "running" if service restarted.
+        # Correct stale status.
+        db_status = project.get("ralph_loop_status", "idle")
+        if db_status == "running":
+            db_status = "idle"
+            async with get_db() as db:
+                await db.execute(
+                    "UPDATE projects SET ralph_loop_status = 'idle' WHERE id = ?",
+                    (project["id"],),
+                )
+                await db.commit()
+
         github_username = user["github_username"]
         stdout_path = DATA_DIR / github_username / name / ".ralph_stdout"
         recent = []
         if stdout_path.exists():
             lines = stdout_path.read_text().splitlines()
-            recent = lines[-50:]  # Last 50 lines
+            recent = lines[-50:]
         return {
-            "status": project.get("ralph_loop_status", "idle"),
+            "status": db_status,
             "current_issue": project.get("ralph_loop_current_issue"),
             "iteration": project.get("ralph_loop_iteration", 0),
             "recent_output": recent,
