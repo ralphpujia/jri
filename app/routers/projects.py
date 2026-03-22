@@ -45,7 +45,10 @@ async def _run(
         raise RuntimeError(
             f"Command timed out after {timeout}s: {' '.join(args)}"
         )
-    return proc.returncode, stdout.decode(), stderr.decode()
+    returncode = proc.returncode
+    if returncode is None:
+        raise RuntimeError(f"Command exited without a return code: {' '.join(args)}")
+    return returncode, stdout.decode(), stderr.decode()
 
 
 async def _get_project_dir(name: str, user: dict) -> str:
@@ -216,7 +219,7 @@ async def create_project(
 
         # 2. git init
         logger.info(f"Creating project {name}: step 2 - git init")
-        rc, _, err = await _run(["git", "init"], cwd=cwd)
+        rc, _, err = await _run(["git", "init", "-b", "main"], cwd=cwd)
         if rc != 0:
             raise RuntimeError(f"git init failed: {err}")
 
