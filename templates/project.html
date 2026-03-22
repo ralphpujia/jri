@@ -407,7 +407,9 @@
         flex-shrink: 0;
     }
     .status-dot.closed { background: #4caf50; }
-    .status-dot.in_progress { background: #e8a820; }
+    .status-dot.in_progress,
+    .status-dot.claimed,
+    .status-dot.active { background: #e8a820; }
     .status-dot.open { background: var(--text-dim); }
     .status-dot.deferred { background: var(--border-focus); opacity: 0.6; }
     .issue-row {
@@ -1568,9 +1570,10 @@
     }
 
     function statusDotHtml(status) {
+        console.log('Rendering status dot for status:', status);
         var cls = 'status-dot';
         if (status === 'closed') cls += ' closed';
-        else if (status === 'in_progress') cls += ' in_progress';
+        else if (status === 'in_progress' || status === 'claimed' || status === 'active') cls += ' in_progress';
         else if (status === 'deferred') cls += ' deferred';
         else cls += ' open';
         return '<span class="' + cls + '"></span>';
@@ -1633,8 +1636,8 @@
         var detail = document.createElement('div');
         detail.className = 'issue-detail';
         var detailParts = [];
-        if (issue.description) detailParts.push('<strong>Description:</strong>' + renderMarkdown(issue.description, true));
-        if (issue.acceptance_criteria) detailParts.push('<strong>Acceptance Criteria:</strong>' + renderMarkdown(issue.acceptance_criteria, true));
+        if (issue.description) detailParts.push('<strong>Description:</strong>' + renderMarkdown(issue.description));
+        if (issue.acceptance_criteria) detailParts.push('<strong>Acceptance Criteria:</strong>' + renderMarkdown(issue.acceptance_criteria));
         if (issue.dependencies && issue.dependencies.length) detailParts.push(renderIssueDependencies(issue.dependencies));
         if (issue.assignee) detailParts.push('<strong>Assignee:</strong> ' + escapeHtml(issue.assignee));
         detail.innerHTML = detailParts.join('<br>');
@@ -1674,7 +1677,7 @@
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 if (data.exists && data.content) {
-                    agentsMdBody.innerHTML = renderMarkdown(data.content, true);
+                    agentsMdBody.innerHTML = renderMarkdown(data.content);
                     agentsMdBody.className = 'agents-md-content';
                 } else {
                     agentsMdBody.innerHTML = '<p class="agents-md-placeholder">AGENTS.md will appear here as Ralphy defines the project structure.</p>';
