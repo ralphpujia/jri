@@ -550,6 +550,7 @@
         display: flex;
         flex-direction: column;
         gap: 0.3rem;
+        margin-bottom: 0.9rem;
     }
     .upload-item {
         display: flex;
@@ -559,6 +560,11 @@
         background: var(--card-bg);
         border-radius: 4px;
         font-size: 0.85rem;
+        cursor: pointer;
+    }
+    .upload-item.active {
+        border: 1px solid var(--border-focus);
+        box-shadow: inset 0 0 0 1px rgba(232, 168, 32, 0.15);
     }
     .upload-item .file-name {
         flex: 1;
@@ -580,6 +586,12 @@
         padding: 0.2rem 0.4rem;
     }
     .upload-item button:hover { color: #ff6666; }
+    .upload-item .preview-btn {
+        color: var(--border-focus);
+    }
+    .upload-item .preview-btn:hover {
+        color: var(--text-bright);
+    }
     .upload-item input.rename-input {
         background: var(--bg-secondary);
         border: 1px solid var(--border-focus);
@@ -588,6 +600,69 @@
         border-radius: 3px;
         font-size: 0.85rem;
         flex: 1;
+    }
+    .upload-inline-preview {
+        background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.08));
+        border: 1px solid var(--border-light);
+        border-radius: 8px;
+        overflow: hidden;
+        margin: -0.1rem 0 0.6rem;
+    }
+    .upload-inline-preview-body {
+        padding: 1rem;
+    }
+    .upload-inline-preview.loading .upload-inline-preview-body,
+    .upload-inline-preview.unsupported .upload-inline-preview-body,
+    .upload-inline-preview.error .upload-inline-preview-body {
+        min-height: 180px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        color: var(--text-faint);
+    }
+    .upload-inline-preview img {
+        display: block;
+        max-width: 100%;
+        max-height: 480px;
+        margin: 0 auto;
+        border-radius: 6px;
+        background: rgba(0,0,0,0.15);
+    }
+    .upload-inline-preview iframe,
+    .upload-inline-preview embed {
+        width: 100%;
+        min-height: 480px;
+        border: none;
+        border-radius: 6px;
+        background: #fff;
+    }
+    .upload-inline-preview pre {
+        margin: 0;
+        padding: 1rem;
+        overflow: auto;
+        max-height: 480px;
+        background: rgba(0,0,0,0.2);
+        border: 1px solid var(--border-light);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 0.82rem;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-family: 'SF Mono','Fira Code',monospace;
+    }
+    @media (max-width: 900px) {
+        .upload-item {
+            flex-wrap: wrap;
+        }
+        .upload-inline-preview iframe,
+        .upload-inline-preview embed,
+        .upload-inline-preview img,
+        .upload-inline-preview pre {
+            max-height: 360px;
+            min-height: 240px;
+        }
     }
     .drop-zone-overlay {
         display: none;
@@ -820,6 +895,10 @@
     var uploadFileInput = document.getElementById('upload-file-input');
     var dropOverlay = document.getElementById('drop-zone-overlay');
     var toastEl = document.getElementById('toast');
+    var currentUploadPreview = null;
+    var uploadPreviewRequest = 0;
+    var currentUploadPreviewHtml = '';
+    var currentUploadPreviewState = 'loading';
 
     /* ══════════════════════════════════════════════
        MARKDOWN RENDERER (basic)
@@ -958,10 +1037,17 @@
         this.style.overflowY = this.scrollHeight > 200 ? 'auto' : 'hidden';
     });
 
-    // Tab+Enter sends, regular Enter for newline / auto-continue lists
+    // Cmd+Enter and Tab+Enter send, regular Enter adds newline / auto-continues lists
     var tabPressed = false;
     var tabTimer = null;
     chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.metaKey) {
+            e.preventDefault();
+            tabPressed = false;
+            clearTimeout(tabTimer);
+            sendMessage();
+            return;
+        }
         if (e.key === 'Tab' && !e.shiftKey) {
             // Let browser move focus to Send button naturally (no preventDefault)
             tabPressed = true;
@@ -1134,8 +1220,8 @@
                     var wasOpen = existingDetails ? existingDetails.open : true;
                     var html = '';
                     if (thinkingText || thinkingSteps.length > 0) {
-                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>Thinking...</summary>';
                         html += '<div class="thinking-content">';
+                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>Thinking...</summary>';
                         if (thinkingText) {
                             html += '<div>' + escapeHtml(thinkingText) + '</div>';
                         }
@@ -1557,42 +1643,149 @@
             .catch(function() {});
     }
 
+    function getUploadUrl(name) {
+        return API + '/uploads/' + encodeURIComponent(name);
+    }
+
+    function isImageFile(name) {
+        return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name || '');
+    }
+
+    function isPdfFile(name) {
+        return /\.pdf$/i.test(name || '');
+    }
+
+    function isTextPreviewable(name) {
+        return /\.(txt|md|markdown|json|csv|html?|css|js|mjs|cjs|ts|tsx|jsx|py|sh|yml|yaml|toml|xml|log|ini|cfg|conf|sql)$/i.test(name || '');
+    }
+
+    function clearUploadPreview() {
+        currentUploadPreview = null;
+        currentUploadPreviewHtml = '';
+        currentUploadPreviewState = 'loading';
+    }
+
+    function setUploadPreviewContent(file, state, bodyHtml) {
+        currentUploadPreview = file.name;
+        currentUploadPreviewState = state;
+        currentUploadPreviewHtml = bodyHtml;
+        renderUploads(window.__lastUploads || []);
+    }
+
+    function buildInlinePreviewHtml(file) {
+        return '' +
+            '<div class="upload-inline-preview ' + currentUploadPreviewState + '">' +
+                '<div class="upload-inline-preview-body">' + currentUploadPreviewHtml + '</div>' +
+            '</div>';
+    }
+
+    function openUploadPreview(file) {
+        if (currentUploadPreview === file.name) {
+            uploadPreviewRequest++;
+            clearUploadPreview();
+            renderUploads(window.__lastUploads || []);
+            return;
+        }
+
+        currentUploadPreview = file.name;
+        var requestId = ++uploadPreviewRequest;
+        setUploadPreviewContent(file, 'loading', 'Loading preview...');
+
+        if (isImageFile(file.name)) {
+            var imageUrl = getUploadUrl(file.name);
+            setUploadPreviewContent(file, 'ready', '<img src="' + imageUrl + '" alt="Preview of ' + escapeHtml(file.name) + '">');
+            return;
+        }
+
+        if (isPdfFile(file.name)) {
+            var pdfUrl = getUploadUrl(file.name);
+            setUploadPreviewContent(file, 'ready', '<iframe src="' + pdfUrl + '" title="Preview of ' + escapeHtml(file.name) + '"></iframe>');
+            return;
+        }
+
+        if (!isTextPreviewable(file.name)) {
+            setUploadPreviewContent(file, 'unsupported', 'No inline preview is available for this file type yet.');
+            return;
+        }
+
+        fetch(getUploadUrl(file.name))
+            .then(function(r) {
+                if (!r.ok) throw new Error('Failed to load preview');
+                return r.text();
+            })
+            .then(function(text) {
+                if (requestId !== uploadPreviewRequest || currentUploadPreview !== file.name) return;
+                setUploadPreviewContent(file, 'ready', '<pre>' + escapeHtml(text) + '</pre>');
+            })
+            .catch(function() {
+                if (requestId !== uploadPreviewRequest || currentUploadPreview !== file.name) return;
+                setUploadPreviewContent(file, 'error', 'Could not load a preview for this file.');
+            });
+    }
+
     function renderUploads(files) {
+        window.__lastUploads = files || [];
         uploadList.innerHTML = '';
         if (!files || files.length === 0) {
             uploadList.innerHTML = '<p class="uploads-empty">No files uploaded yet.</p>';
+            clearUploadPreview();
             return;
         }
+        var previewExists = false;
         files.forEach(function(f) {
+            if (currentUploadPreview === f.name) previewExists = true;
             var item = document.createElement('div');
             item.className = 'upload-item';
+            item.setAttribute('data-upload-name', f.name);
+            if (currentUploadPreview === f.name) item.classList.add('active');
+            item.addEventListener('click', function() {
+                openUploadPreview(f);
+            });
 
             var nameSpan = document.createElement('span');
             nameSpan.className = 'file-name';
             nameSpan.textContent = f.name;
-            nameSpan.title = 'Click to rename';
-            nameSpan.addEventListener('click', function() {
-                startRename(item, f.name);
-            });
+            nameSpan.title = 'Click to preview';
 
             var metaSpan = document.createElement('span');
             metaSpan.className = 'file-meta';
             metaSpan.textContent = formatSize(f.size) + ' \u00B7 ' + formatDate(f.modified_at);
+
+            var renameBtn = document.createElement('button');
+            renameBtn.className = 'preview-btn';
+            renameBtn.textContent = 'Rename';
+            renameBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                startRename(item, f.name);
+            });
 
             var delBtn = document.createElement('button');
             delBtn.textContent = 'Delete';
             delBtn.addEventListener('click', function(e) {
                 e.stopPropagation();
                 if (!confirm('Delete "' + f.name + '"?')) return;
+                if (currentUploadPreview === f.name) {
+                    uploadPreviewRequest++;
+                    clearUploadPreview();
+                }
                 fetch(API + '/uploads/' + encodeURIComponent(f.name), { method: 'DELETE' })
                     .then(function() { fetchUploads(); });
             });
 
             item.appendChild(nameSpan);
             item.appendChild(metaSpan);
+            item.appendChild(renameBtn);
             item.appendChild(delBtn);
             uploadList.appendChild(item);
+            if (currentUploadPreview === f.name) {
+                var previewItem = document.createElement('div');
+                previewItem.innerHTML = buildInlinePreviewHtml(f);
+                uploadList.appendChild(previewItem.firstChild);
+            }
         });
+        if (!previewExists && currentUploadPreview) {
+            clearUploadPreview();
+        }
     }
 
     function startRename(item, oldName) {
@@ -1614,7 +1807,14 @@
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ new_name: newName }),
-            }).then(function() { fetchUploads(); });
+            })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (currentUploadPreview === oldName) {
+                        currentUploadPreview = data.name;
+                    }
+                    fetchUploads();
+                });
         }
 
         input.addEventListener('keydown', function(e) {

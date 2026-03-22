@@ -1,8 +1,9 @@
+import mimetypes
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
 from app.auth_utils import get_current_user
@@ -51,6 +52,17 @@ def _resolve_collision(directory: Path, filename: str) -> str:
         counter += 1
 
 
+def _get_upload_path(project_dir: Path, filename: str) -> Path:
+    """Validate and return the path for an uploaded file."""
+    if _has_path_traversal(filename):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = project_dir / "uploads" / filename
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    return file_path
+
+
 class RenameRequest(BaseModel):
     new_name: str
 
@@ -90,7 +102,7 @@ async def upload_file(
     uploads_dir = project_dir / "uploads"
     uploads_dir.mkdir(parents=True, exist_ok=True)
 
-    actual_name = _resolve_collision(uploads_dir, file.filename)
+    actual_name = _resolve_collision(uploads_dir, str(file.filename or "upload"))
     dest = uploads_dir / actual_name
 
     content = await file.read()
@@ -99,20 +111,27 @@ async def upload_file(
     return {"name": actual_name, "size": len(content)}
 
 
+@router.get("/{name}/uploads/{filename}")
+async def get_upload(
+    name: str,
+    filename: str,
+    user: dict = Depends(get_current_user),
+):
+    project_dir = await _get_project_dir(name, user)
+    file_path = _get_upload_path(project_dir, filename)
+    media_type, _ = mimetypes.guess_type(str(file_path))
+    headers = {"Content-Disposition": f'inline; filename="{file_path.name}"'}
+    return FileResponse(file_path, media_type=media_type, headers=headers)
+
+
 @router.delete("/{name}/uploads/{filename}")
 async def delete_upload(
     name: str,
     filename: str,
     user: dict = Depends(get_current_user),
 ):
-    if _has_path_traversal(filename):
-        raise HTTPException(status_code=400, detail="Invalid filename")
-
     project_dir = await _get_project_dir(name, user)
-    file_path = project_dir / "uploads" / filename
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+    file_path = _get_upload_path(project_dir, filename)
 
     file_path.unlink()
     return JSONResponse(status_code=204, content=None)
@@ -125,15 +144,12 @@ async def rename_upload(
     body: RenameRequest,
     user: dict = Depends(get_current_user),
 ):
-    if _has_path_traversal(filename) or _has_path_traversal(body.new_name):
+    if _has_path_traversal(body.new_name):
         raise HTTPException(status_code=400, detail="Invalid filename")
 
     project_dir = await _get_project_dir(name, user)
     uploads_dir = project_dir / "uploads"
-    file_path = uploads_dir / filename
-
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+    file_path = _get_upload_path(project_dir, filename)
 
     actual_name = _resolve_collision(uploads_dir, body.new_name)
     file_path.rename(uploads_dir / actual_name)
