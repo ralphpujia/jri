@@ -263,6 +263,48 @@ def test_upload_preview(page: Page):
         delete_project_api(project_name)
 
 
+def test_chat_attachment_can_be_cleared(page: Page):
+    """Attach a file in chat, clear it, and verify it is removed."""
+    project_name = f"e2e-chat-attach-clear-{int(time.time())}"
+
+    try:
+        create_project_api(project_name)
+
+        page.goto(f"{BASE_URL}/project/{project_name}")
+        page.wait_for_load_state("domcontentloaded")
+
+        page.locator(".chat-msg.assistant").first.wait_for(state="visible", timeout=60000)
+        page.wait_for_function(
+            "() => !document.getElementById('chat-input').disabled",
+            timeout=60000,
+        )
+
+        page.locator("#file-input").set_input_files({
+            "name": "mock-image.png",
+            "mimeType": "image/png",
+            "buffer": b"\x89PNG\r\n\x1a\nmock",
+        })
+
+        attachment_names = page.locator("#attachment-names")
+        attachment_names.wait_for(state="visible", timeout=5000)
+        expect_text = attachment_names.inner_text()
+        assert "mock-image.png" in expect_text
+
+        attachment_names.locator("button").click()
+
+        page.wait_for_function(
+            """() => {
+                const input = document.getElementById('file-input');
+                const names = document.getElementById('attachment-names');
+                return input.files.length === 0 && names.textContent.trim() === '';
+            }""",
+            timeout=5000,
+        )
+
+    finally:
+        delete_project_api(project_name)
+
+
 def test_project_delete(page: Page):
     """Create project, verify it shows on dashboard, delete it, verify it's gone."""
     project_name = f"e2e-del-{int(time.time())}"
