@@ -1421,7 +1421,19 @@
         wrapper.className = 'chat-msg assistant jri-msg';
         var jriBtn = document.createElement('button');
         jriBtn.className = 'btn-jri';
-        jriBtn.textContent = 'Just Ralph It';
+
+        var isActive = projectData && (projectData.ralph_loop_status === 'running' || projectData.ralph_loop_status === 'stopping');
+        if (isActive) {
+            jriBtn.textContent = 'Ralph is building...';
+            jriBtn.disabled = true;
+            jriBtn.style.opacity = '0.5';
+            jriBtn.style.cursor = 'not-allowed';
+            jriBtn.style.background = 'var(--border-light)';
+            jriBtn.style.color = 'var(--text-dim)';
+        } else {
+            jriBtn.textContent = 'Just Ralph It';
+        }
+
         jriBtn.addEventListener('click', function() {
             jriBtn.disabled = true;
             jriBtn.textContent = 'Starting...';
