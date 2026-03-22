@@ -243,11 +243,9 @@ async def create_project(
                         "--shared-server",
                         "-p",
                         name,
-                        "--skip-hooks",
-                        "--skip-agents",
                     ],
                     cwd=cwd,
-                    timeout=90,
+                    timeout=10,
                 )
             except RuntimeError as exc:
                 rc = -1
