@@ -937,10 +937,17 @@
         this.style.overflowY = this.scrollHeight > 200 ? 'auto' : 'hidden';
     });
 
-    // Tab+Enter sends, regular Enter for newline / auto-continue lists
+    // Cmd+Enter and Tab+Enter send, regular Enter adds newline / auto-continues lists
     var tabPressed = false;
     var tabTimer = null;
     chatInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && e.metaKey) {
+            e.preventDefault();
+            tabPressed = false;
+            clearTimeout(tabTimer);
+            sendMessage();
+            return;
+        }
         if (e.key === 'Tab' && !e.shiftKey) {
             // Let browser move focus to Send button naturally (no preventDefault)
             tabPressed = true;
@@ -1081,8 +1088,8 @@
                     var wasOpen = existingDetails ? existingDetails.open : true;
                     var html = '';
                     if (thinkingText || thinkingSteps.length > 0) {
-                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>Thinking...</summary>';
                         html += '<div class="thinking-content">';
+                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>Thinking...</summary>';
                         if (thinkingText) {
                             html += '<div>' + escapeHtml(thinkingText) + '</div>';
                         }
