@@ -682,7 +682,7 @@
             <div id="attachment-names" class="attachment-names"></div>
             <div class="chat-input-area">
                 <button id="btn-attach" class="btn-attach" title="Attach files"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-right: 4px;"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.49"/></svg>Attach</button>
-                <textarea id="chat-input" placeholder="Type your message... (markdown encouraged, Tab+Enter to send)" rows="1" autofocus></textarea>
+                <textarea id="chat-input" placeholder="Type your message..." rows="1" autofocus></textarea>
                 <button id="btn-send" class="btn-send">Send</button>
             </div>
             <input type="file" id="file-input" multiple accept="image/*,application/pdf" style="display:none;">
@@ -755,6 +755,24 @@
     var attachedFiles = [];
     var issuesData = null;
     var projectData = null;
+
+    function updateAttachmentDisplay() {
+        var attachmentNames = document.getElementById('attachment-names');
+        if (attachedFiles.length === 0) {
+            attachmentNames.innerHTML = '';
+            return;
+        }
+        var html = attachedFiles.map(function(f) { return f.name; }).join(', ');
+        html += ' <button onclick="clearAttachments()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:0.9rem;padding:0 0.3rem;" title="Clear attachments">&times;</button>';
+        attachmentNames.innerHTML = html;
+    }
+
+    function clearAttachments() {
+        attachedFiles = [];
+        var fileInput = document.getElementById('file-input');
+        fileInput.value = '';
+        updateAttachmentDisplay();
+    }
 
     /* ══════════════════════════════════════════════
        LOCAL STORAGE HELPERS
@@ -1009,7 +1027,7 @@
     btnAttach.addEventListener('click', function() { fileInput.click(); });
     fileInput.addEventListener('change', function() {
         var files = Array.from(fileInput.files || []);
-        if (files.length > 3) {
+        if (attachedFiles.length + files.length > 3) {
             alert('Maximum 3 files allowed.');
             fileInput.value = '';
             return;
@@ -1020,8 +1038,8 @@
             fileInput.value = '';
             return;
         }
-        attachedFiles = files;
-        attachmentNames.textContent = files.map(function(f) { return f.name; }).join(', ');
+        attachedFiles = attachedFiles.concat(files);
+        updateAttachmentDisplay();
     });
 
     chatInput.addEventListener('paste', function(e) {
@@ -1047,7 +1065,7 @@
 
         // Add to attachments
         attachedFiles = attachedFiles.concat(files);
-        attachmentNames.textContent = attachedFiles.map(function(f) { return f.name; }).join(', ');
+        updateAttachmentDisplay();
     });
 
     function sendMessage() {

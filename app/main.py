@@ -59,6 +59,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Just Ralph It", lifespan=lifespan)
 
+# Increase multipart upload limit (default is 1MB, we allow 3MB files)
+from starlette.formparsers import MultiPartParser
+MultiPartParser.max_file_size = 1024 * 1024 * 10  # 10MB
+
 # Mount static files
 _static_dir = Path(__file__).resolve().parent.parent / "static"
 app.mount("/static", StaticFiles(directory=str(_static_dir)), name="static")

@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import shutil
 import uuid
 from pathlib import Path
 
@@ -113,29 +112,26 @@ async def _validate_attachments(attachments: list[UploadFile]) -> list[tuple[str
     return validated
 
 
-def _save_attachments(
+def _save_attachments_to_uploads(
     project_dir: str, validated: list[tuple[str, bytes]]
-) -> tuple[Path, list[Path]]:
-    """Save validated attachments to .tmp_attachments/ and return (tmp_dir, paths)."""
-    tmp_dir = Path(project_dir) / ".tmp_attachments"
-    tmp_dir.mkdir(parents=True, exist_ok=True)
+) -> list[str]:
+    """Save validated attachments to uploads/ and return list of filenames."""
+    uploads_dir = Path(project_dir) / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
 
-    saved_paths: list[Path] = []
+    filenames: list[str] = []
     for filename, content in validated:
-        dest = tmp_dir / filename
+        dest = uploads_dir / filename
         dest.write_bytes(content)
-        saved_paths.append(dest)
+        filenames.append(filename)
 
-    return tmp_dir, saved_paths
+    return filenames
 
 
-def _prepend_attachment_info(message: str, saved_paths: list[Path]) -> str:
-    """Prepend attachment file references to the user message."""
-    file_descriptions = ", ".join(
-        f"{p.name} (saved at {p})" for p in saved_paths
-    )
-    prefix = f"The user attached file(s): {file_descriptions}. Please read and analyze them."
-    return f"{prefix}\n\n{message}"
+def _prepend_attachment_info(message: str, filenames: list[str]) -> str:
+    """Prepend attachment names to the user message."""
+    names = ", ".join(filenames)
+    return f"Attachments: {names}\n\n{message}"
 
 
 async def _stream_claude(
@@ -144,7 +140,6 @@ async def _stream_claude(
     session_id: str,
     is_new_session: bool,
     user_message: str,
-    tmp_attachments_dir: Path | None = None,
 ):
     """Async generator that spawns claude CLI and yields SSE events."""
     args = _build_claude_args(session_id, is_new_session, user_message)
@@ -231,9 +226,6 @@ async def _stream_claude(
         yield f"data: {json.dumps(event)}\n\n"
 
     finally:
-        # Clean up temp attachments
-        if tmp_attachments_dir and tmp_attachments_dir.exists():
-            shutil.rmtree(tmp_attachments_dir, ignore_errors=True)
         await sse_bus.publish(project_name, "ralphy_processing", {"status": "end"})
 
 
@@ -248,7 +240,6 @@ async def chat(
     project_dir = str(DATA_DIR / github_username / name)
 
     content_type = request.headers.get("content-type", "")
-    tmp_attachments_dir: Path | None = None
 
     if "multipart/form-data" in content_type:
         form = await request.form()
@@ -263,8 +254,8 @@ async def chat(
 
         if attachments:
             validated = await _validate_attachments(attachments)
-            tmp_attachments_dir, saved_paths = _save_attachments(project_dir, validated)
-            message = _prepend_attachment_info(message, saved_paths)
+            filenames = _save_attachments_to_uploads(project_dir, validated)
+            message = _prepend_attachment_info(message, filenames)
 
         user_message = message
     else:
@@ -292,7 +283,6 @@ async def chat(
             session_id=session_id,
             is_new_session=is_new,
             user_message=user_message,
-            tmp_attachments_dir=tmp_attachments_dir,
         ),
         media_type="text/event-stream",
         headers={
