@@ -8,9 +8,9 @@
 - **`claude` CLI** subprocess for Ralph loop (Claude Opus 4.6)
 - **Beads (`bd` v0.60)** as the issue tracker — Dolt-based, filesystem-local, graph-aware dependencies
 - **SQLite** for app metadata (users, projects, GitHub tokens — plaintext for now, accepted risk)
-- **GitHub OAuth** via GitHub App (credentials in ~/jri.env)
+- **GitHub OAuth** via GitHub App (credentials in .env)
 - **`ralphpujia`** bot account (authed via `gh` CLI) creates repos, pushes commits with `Co-authored-by: <user>`
-- **Stripe** for per-project billing (test creds in ~/jri.env — NOTE: both keys are pk_test_, need sk_test_ for secret)
+- **Stripe** for per-project billing (live + test creds in .env)
 - **SSE** for all real-time streaming (Ralph stdout, issue updates, notifications)
 - **Domain**: justralph.it — nginx currently serves static HTML, will proxy to uvicorn app
 - Pre-installed: claude 2.1.81, bd 0.60.0, opencode, python 3.12, node 22, nginx 1.24, gh CLI

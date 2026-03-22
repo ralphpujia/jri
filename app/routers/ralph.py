@@ -68,20 +68,6 @@ async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session or grant free tier access."""
     project = await _get_project(name, user)
 
-    # Count how many of this user's projects already have a payment
-    async with get_db() as db:
-        cursor = await db.execute(
-            "SELECT COUNT(*) FROM projects WHERE user_id = ? AND stripe_payment_id IS NOT NULL",
-            (user["id"],),
-        )
-        row = await cursor.fetchone()
-        paid_count = row[0]
-
-    # Free tier: first project is free if no projects have been paid for yet
-    if paid_count == 0 and project.get("stripe_payment_id") is None:
-        await _start_ralph_loop(name, project, user)
-        return {"free": True, "redirect": None}
-
     # Create Stripe Checkout Session
     checkout_session = stripe.checkout.Session.create(
         mode="payment",
