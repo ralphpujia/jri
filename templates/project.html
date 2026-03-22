@@ -1817,9 +1817,15 @@
             addChatMessage(msg.role, renderMarkdown(msg.content));
         });
 
-        // 1b. Restore JRI button if it was showing before refresh
+        // 1b. Restore JRI button if it was showing before refresh,
+        // or if any restored message mentions "just ralph it"
         if (localStorage.getItem(STORAGE_KEY + '-jri') === 'true') {
             showJriButton();
+        } else {
+            var hasJriMention = history.some(function(msg) {
+                return msg.role === 'assistant' && /just ralph it/i.test(msg.content);
+            });
+            if (hasJriMention) showJriButton();
         }
 
         scrollChat();
