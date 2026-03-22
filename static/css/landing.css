@@ -11,7 +11,6 @@ body.landing {
     --landing-text-muted: #666;
     --landing-accent: #FFD700;
     --landing-accent-hover: #e6c200;
-    --landing-red: #FF0033;
     --landing-border: #333;
     --landing-font: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
@@ -20,6 +19,19 @@ body.landing {
     background-color: var(--landing-bg);
     color: var(--landing-text);
     font-family: var(--landing-font);
+}
+
+@media (prefers-color-scheme: light) {
+    body.landing {
+        --landing-bg: #fafafa;
+        --landing-card-bg: #ffffff;
+        --landing-text: #1a1a1a;
+        --landing-text-bright: #000;
+        --landing-text-muted: #666;
+        --landing-accent: #d4a800;
+        --landing-accent-hover: #b89200;
+        --landing-border: #ddd;
+    }
 }
 
 /* ==========================================================================
@@ -98,16 +110,7 @@ body.landing {
     text-align: center;
     min-width: 340px;
     max-width: 24rem;
-}
-
-/* Red accent square (top-right corner of card) */
-.red-accent {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 12px;
-    height: 12px;
-    background-color: var(--landing-red);
+    overflow: hidden;
 }
 
 /* ==========================================================================
@@ -160,7 +163,7 @@ body.landing {
 
 /* Title text */
 .landing-title {
-    font-size: 3rem;
+    font-size: clamp(1.5rem, 5vw, 3rem);
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.2em;
@@ -168,6 +171,7 @@ body.landing {
     margin: 0;
     padding: 0 0.5rem;
     font-family: var(--landing-font);
+    word-break: break-word;
 }
 
 /* Subtitle (accent color, small caps) */
@@ -268,11 +272,6 @@ body.landing {
         min-width: 0;
         margin: 1rem;
         padding: 1.5rem;
-    }
-
-    .landing-title {
-        font-size: 2rem;
-        letter-spacing: 0.1em;
     }
 
     .landing-subtitle {
