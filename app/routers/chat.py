@@ -16,7 +16,7 @@ from app.sse_bus import sse_bus
 
 router = APIRouter(prefix="/api/projects", tags=["chat"])
 
-ALLOWED_TOOLS = "Bash(bd:*) Bash(git:*) Read Glob Grep Write(AGENTS.md) Edit(AGENTS.md)"
+ALLOWED_TOOLS = "Bash(bd:*) Bash(git:*) Read Glob Grep Write(AGENTS.md) Edit(AGENTS.md) WebSearch WebFetch"
 MAX_MESSAGE_LENGTH = 50_000
 
 ALLOWED_MIME_TYPES = {
@@ -78,6 +78,7 @@ def _build_claude_args(
         "--output-format", "stream-json",
         "--verbose",
         "--allowedTools", ALLOWED_TOOLS,
+        "--continue",
         "--", user_message,
     ]
     return args
@@ -194,17 +195,10 @@ async def _stream_claude(
         if proc.returncode != 0:
             stderr_bytes = await proc.stderr.read()
             stderr_text = stderr_bytes.decode().strip()
-            context_keywords = ["context", "token", "length", "too long", "max_tokens"]
-            if any(kw in stderr_text.lower() for kw in context_keywords):
-                event = {
-                    "type": "error",
-                    "message": "The conversation is getting too long. Please start a new session.",
-                }
-            else:
-                event = {
-                    "type": "error",
-                    "message": f"Claude exited with code {proc.returncode}: {stderr_text}",
-                }
+            event = {
+                "type": "error",
+                "message": f"Claude exited with code {proc.returncode}: {stderr_text}",
+            }
             yield f"data: {json.dumps(event)}\n\n"
 
     except Exception as exc:

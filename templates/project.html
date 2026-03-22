@@ -187,9 +187,12 @@
     .chat-msg strong { color: var(--text-bright); }
     /* ── Thinking/tool-use collapsible ── */
     .chat-msg .thinking {
-        margin-bottom: 0.5rem;
+        margin-bottom: 0;
         color: var(--text-dim);
         font-size: 0.8rem;
+    }
+    .chat-msg .thinking-content + .message-text {
+        margin-top: 0.5rem;
     }
     .chat-msg .thinking summary {
         cursor: pointer;
@@ -895,9 +898,13 @@
         } catch(e) {}
     }
 
-    function appendToHistory(role, content) {
+    function appendToHistory(role, content, thinkingText, thinkingSteps, interleaveText) {
         var history = loadChatHistory();
-        history.push({ role: role, content: content });
+        var entry = { role: role, content: content };
+        if (thinkingText) entry.thinkingText = thinkingText;
+        if (thinkingSteps && thinkingSteps.length > 0) entry.thinkingSteps = thinkingSteps;
+        if (interleaveText) entry.interleaveText = interleaveText;
+        history.push(entry);
         saveChatHistory(history);
     }
 
@@ -1264,7 +1271,7 @@
                     savePendingMessage();
                     // Preserve <details> open state across rebuilds
                     var existingDetails = msgDiv.querySelector('details.thinking');
-                    var wasOpen = existingDetails ? existingDetails.open : true;
+                    var wasOpen = existingDetails ? existingDetails.open : false;
                     var html = '';
                     if (initialText) {
                         html += '<div class="message-text">' + renderMarkdown(initialText) + '</div>';
@@ -1301,7 +1308,7 @@
                         if (result.done) {
                             localStorage.removeItem(STORAGE_KEY + '-pending');
                             var combinedText = getCombinedAssistantText();
-                            if (combinedText) appendToHistory('assistant', combinedText);
+                            if (combinedText) appendToHistory('assistant', combinedText, thinkingText, thinkingSteps, interleaveText);
                             setProcessing(false);
                             checkJriVisibility(combinedText);
                             return;
@@ -2150,7 +2157,27 @@
         // 1. Restore chat history from localStorage
         var history = loadChatHistory();
         history.forEach(function(msg) {
-            addChatMessage(msg.role, renderMarkdown(msg.content));
+            var html = '';
+            if (msg.thinkingText || (msg.thinkingSteps && msg.thinkingSteps.length > 0)) {
+                html += '<div class="thinking-content">';
+                html += '<details class="thinking"><summary>Thinking...</summary>';
+                if (msg.thinkingText) {
+                    html += '<div>' + escapeHtml(msg.thinkingText) + '</div>';
+                }
+                if (msg.thinkingSteps && msg.thinkingSteps.length > 0) {
+                    msg.thinkingSteps.forEach(function(s) {
+                        html += '<div>Tool: ' + escapeHtml(s) + '</div>';
+                    });
+                }
+                if (msg.interleaveText) {
+                    html += '<div class="thinking-interleave">' + escapeHtml(msg.interleaveText) + '</div>';
+                }
+                html += '</div></details>';
+            }
+            if (msg.content) {
+                html += '<div class="message-text">' + renderMarkdown(msg.content) + '</div>';
+            }
+            addChatMessage(msg.role, html);
         });
 
         // 1b. Restore pending message from interrupted stream
@@ -2163,7 +2190,7 @@
                     restoredParts.push('<div class="message-text">' + renderMarkdown(pending.initialText) + '</div>');
                 }
                 if (pending.thinkingText || (pending.thinkingSteps && pending.thinkingSteps.length > 0)) {
-                    restoredParts.push('<div class="thinking-content"><details class="thinking" open><summary>' +
+                    restoredParts.push('<div class="thinking-content"><details class="thinking"><summary>' +
                         (pending.thinkingComplete ? 'Finished thinking' : 'Thinking...') +
                         '</summary>');
                     if (pending.thinkingText) {
