@@ -1560,12 +1560,27 @@
     /* ══════════════════════════════════════════════
        ISSUES TAB
        ══════════════════════════════════════════════ */
+    function hasOpenIssues(data) {
+        if (!data) return false;
+        var found = false;
+        (data.epics || []).forEach(function(e) {
+            (e.children || []).forEach(function(c) {
+                if (c.status === 'open' || c.status === 'deferred') found = true;
+            });
+        });
+        (data.ungrouped || []).forEach(function(c) {
+            if (c.status === 'open' || c.status === 'deferred') found = true;
+        });
+        return found;
+    }
+
     function fetchIssues() {
         return fetch(API + '/issues')
             .then(function(r) { return r.json(); })
             .then(function(data) {
                 issuesData = data;
                 renderIssues(data);
+                if (hasOpenIssues(data)) showJriButton();
             })
             .catch(function() {});
     }
