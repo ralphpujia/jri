@@ -73,10 +73,26 @@ app.include_router(uploads.router)
 app.include_router(sse.router)
 
 
-@app.middleware("http")
-async def subdomain_middleware(request: Request, call_next):
-    subdomain = request.headers.get("x-subdomain")
-    if subdomain:
-        from app.routers.deploy_proxy import handle_subdomain_request
-        return await handle_subdomain_request(request, subdomain)
-    return await call_next(request)
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+
+class SubdomainMiddleware:
+    """Route subdomain requests without wrapping responses (avoids StreamingResponse issues)."""
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            subdomain = headers.get(b"x-subdomain", b"").decode()
+            if subdomain:
+                from app.routers.deploy_proxy import handle_subdomain_request
+                from starlette.requests import Request as StarletteRequest
+                request = StarletteRequest(scope, receive, send)
+                response = await handle_subdomain_request(request, subdomain)
+                await response(scope, receive, send)
+                return
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(SubdomainMiddleware)
