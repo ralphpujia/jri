@@ -75,6 +75,24 @@ async def _get_project_dir(name: str, user: dict) -> str:
     return str(project_dir)
 
 
+def _normalize_dependencies(issue: dict) -> list[dict]:
+    """Convert bd dependency objects into UI-friendly dependency entries."""
+    normalized: list[dict] = []
+
+    for dep in issue.get("dependencies") or []:
+        if not isinstance(dep, dict):
+            continue
+
+        dep_type = dep.get("type") or "related"
+        depends_on_id = dep.get("depends_on_id")
+        if not depends_on_id or dep_type == "parent-child":
+            continue
+
+        normalized.append({"id": depends_on_id, "type": dep_type})
+
+    return normalized
+
+
 @router.get("/{name}/issues")
 async def list_issues(
     name: str,
@@ -109,7 +127,9 @@ async def list_issues(
     )
 
     def _pick(issue: dict) -> dict:
-        return {k: issue.get(k) for k in _FIELDS}
+        picked = {k: issue.get(k) for k in _FIELDS}
+        picked["dependencies"] = _normalize_dependencies(issue)
+        return picked
 
     epics_map: dict[str, dict] = {}  # epic id -> epic dict with children
     ungrouped: list[dict] = []

@@ -443,6 +443,35 @@
     }
     .issue-detail.expanded { display: block; }
     .issue-detail strong { color: var(--text-muted); }
+    .issue-detail p { margin: 0.25rem 0; }
+    .issue-detail ul, .issue-detail ol {
+        margin: 0.35rem 0;
+        padding-left: 1.4rem;
+    }
+    .issue-detail li + li { margin-top: 0.15rem; }
+    .issue-detail code {
+        background: var(--code-bg);
+        padding: 0.1rem 0.3rem;
+        border-radius: 3px;
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.9em;
+    }
+    .issue-detail pre {
+        margin: 0.4rem 0;
+        padding: 0.55rem;
+        overflow-x: auto;
+        background: var(--code-bg);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+    }
+    .issue-detail pre code {
+        background: none;
+        padding: 0;
+    }
+    .issue-detail-deps {
+        margin: 0.25rem 0 0;
+        padding-left: 1.15rem;
+    }
 
     /* ── AGENTS.md tab ── */
     .agents-md-content {
@@ -1202,14 +1231,25 @@
                 var buffer = '';
                 var msgDiv = null;
                 var fullText = '';
-                var interleaveText = '';
-                var hasToolUse = false;
                 var thinkingSteps = [];
                 var thinkingText = '';
-                var hasContent = false;
+                var thinkingComplete = false;
                 function savePendingMessage() {
-                    var pending = { thinkingText: thinkingText, thinkingSteps: thinkingSteps, fullText: fullText, interleaveText: interleaveText };
+                    var pending = {
+                        thinkingText: thinkingText,
+                        thinkingSteps: thinkingSteps,
+                        fullText: fullText,
+                        thinkingComplete: thinkingComplete
+                    };
                     try { localStorage.setItem(STORAGE_KEY + '-pending', JSON.stringify(pending)); } catch(e) {}
+                }
+
+                function hasThinkingContent() {
+                    return !!thinkingText || thinkingSteps.length > 0;
+                }
+
+                function getThinkingSummary() {
+                    return thinkingComplete ? 'Finished thinking' : 'Thinking...';
                 }
 
                 function rebuildMsg() {
@@ -1219,9 +1259,9 @@
                     var existingDetails = msgDiv.querySelector('details.thinking');
                     var wasOpen = existingDetails ? existingDetails.open : true;
                     var html = '';
-                    if (thinkingText || thinkingSteps.length > 0) {
+                    if (hasThinkingContent()) {
                         html += '<div class="thinking-content">';
-                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>Thinking...</summary>';
+                        html += '<details class="thinking"' + (wasOpen ? ' open' : '') + '><summary>' + getThinkingSummary() + '</summary>';
                         if (thinkingText) {
                             html += '<div>' + escapeHtml(thinkingText) + '</div>';
                         }
@@ -1230,12 +1270,9 @@
                                 html += '<div>Tool: ' + escapeHtml(s) + '</div>';
                             });
                         }
-                        if (interleaveText) {
-                            html += '<div class="thinking-interleave">' + escapeHtml(interleaveText) + '</div>';
-                        }
                         html += '</div></details>';
                     }
-                    if (fullText) {
+                    if (fullText && (!hasThinkingContent() || thinkingComplete)) {
                         html += '<div class="message-text">' + renderMarkdown(fullText) + '</div>';
                     }
                     msgDiv.innerHTML = html;
@@ -1269,18 +1306,12 @@
                                 var evt = JSON.parse(jsonStr);
                             } catch(e) { return; }
 
-                            if (!hasContent && (evt.type === 'thinking' || evt.type === 'text' || evt.type === 'tool_use')) {
-                                hasContent = true;
-                                thinkingEl.className = 'thinking-indicator';
-                            }
-
                             if (evt.type === 'thinking') {
                                 thinkingText += evt.content;
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'tool_use') {
-                                hasToolUse = true;
                                 var label = evt.name || 'Working...';
                                 thinkingSteps.push(label);
                                 // Refresh issues when Ralphy uses Bash (likely bd commands)
@@ -1297,16 +1328,22 @@
                                 rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'text') {
-                                if (hasToolUse) {
-                                    interleaveText += evt.content;
-                                } else {
-                                    fullText += evt.content;
+                                if (hasThinkingContent()) {
+                                    thinkingComplete = true;
                                 }
+                                fullText += evt.content;
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 scrollChat();
                             } else if (evt.type === 'done') {
-                                if (evt.result) fullText = evt.result;
+                                if (hasThinkingContent()) {
+                                    thinkingComplete = true;
+                                }
+                                // Prefer the final result only when it cleanly extends the streamed text,
+                                // so we do not replace the visible answer with a different duplicate payload.
+                                if (evt.result && (!fullText || (evt.result.length > fullText.length && evt.result.indexOf(fullText) === 0))) {
+                                    fullText = evt.result;
+                                }
                                 localStorage.removeItem(STORAGE_KEY + '-pending');
                                 ensureMsgDiv();
                                 rebuildMsg();
@@ -1567,9 +1604,9 @@
         var detail = document.createElement('div');
         detail.className = 'issue-detail';
         var detailParts = [];
-        if (issue.description) detailParts.push('<strong>Description:</strong> ' + escapeHtml(issue.description));
-        if (issue.acceptance_criteria) detailParts.push('<strong>Acceptance Criteria:</strong> ' + escapeHtml(issue.acceptance_criteria));
-        if (issue.dependencies) detailParts.push('<strong>Dependencies:</strong> ' + escapeHtml(issue.dependencies));
+        if (issue.description) detailParts.push('<strong>Description:</strong>' + renderMarkdown(issue.description, true));
+        if (issue.acceptance_criteria) detailParts.push('<strong>Acceptance Criteria:</strong>' + renderMarkdown(issue.acceptance_criteria, true));
+        if (issue.dependencies && issue.dependencies.length) detailParts.push(renderIssueDependencies(issue.dependencies));
         if (issue.assignee) detailParts.push('<strong>Assignee:</strong> ' + escapeHtml(issue.assignee));
         detail.innerHTML = detailParts.join('<br>');
 
@@ -1580,6 +1617,19 @@
         frag.appendChild(row);
         frag.appendChild(detail);
         return frag;
+    }
+
+    function renderIssueDependencies(dependencies) {
+        var items = (dependencies || []).map(function(dep) {
+            if (!dep || !dep.id) return '';
+            var label = dep.type && dep.type !== 'blocks'
+                ? escapeHtml(dep.type) + ': ' + escapeHtml(dep.id)
+                : escapeHtml(dep.id);
+            return '<li>' + label + '</li>';
+        }).filter(Boolean);
+
+        if (!items.length) return '';
+        return '<strong>Dependencies:</strong><ul class="issue-detail-deps">' + items.join('') + '</ul>';
     }
 
     function escapeHtml(str) {
