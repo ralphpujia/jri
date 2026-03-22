@@ -501,13 +501,6 @@
         height: 100%;
         overflow-y: auto;
     }
-    .ralph-working-on {
-        color: #e8a820;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-        font-family: inherit;
-        font-size: 0.85rem;
-    }
     .ralph-done-msg {
         color: #4caf50;
         font-weight: 600;
@@ -720,7 +713,6 @@
             </div>
             <div id="tab-issues" class="tab-pane"></div>
             <div id="tab-ralph" class="tab-pane">
-                <div id="ralph-working-on" class="ralph-working-on" style="display:none;"></div>
                 <div id="ralph-terminal" class="ralph-terminal">Ralph's build output will appear here once you start the build.</div>
             </div>
             <div id="tab-uploads" class="tab-pane">
@@ -804,7 +796,6 @@
     var mainLayout = document.getElementById('main-layout');
     var tabBtnRalph = document.getElementById('tab-btn-ralph');
     var ralphTerminal = document.getElementById('ralph-terminal');
-    var ralphWorkingOn = document.getElementById('ralph-working-on');
     var agentsMdBody = document.getElementById('agents-md-body');
     var uploadList = document.getElementById('upload-list');
     var btnUploadFile = document.getElementById('btn-upload-file');
@@ -1300,9 +1291,10 @@
             btnRalphStop.disabled = true;
             btnRalphResume.disabled = false;
         } else {
-            // idle — both disabled
+            // idle
             btnRalphStop.disabled = true;
-            btnRalphResume.disabled = true;
+            // Allow restart if Ralph has run before
+            btnRalphResume.disabled = !(projectData && projectData.ralph_loop_iteration > 0);
         }
     }
 
@@ -1465,12 +1457,7 @@
     }
 
     function setRalphWorkingOn(issueId, title) {
-        if (issueId) {
-            ralphWorkingOn.style.display = 'block';
-            ralphWorkingOn.textContent = 'Working on: ' + issueId + (title ? ' \u2014 ' + title : '');
-        } else {
-            ralphWorkingOn.style.display = 'none';
-        }
+        // No-op: removed redundant working-on display
     }
 
     /* ══════════════════════════════════════════════

@@ -178,6 +178,8 @@ class RalphLoop:
                 # Filter out epics
                 issues = [i for i in issues if i.get("issue_type") != "epic"]
 
+                logger.info("Project %s: found %d ready issues", self.project_name, len(issues))
+
                 if not issues:
                     self.status = "stopped"
                     await self._update_db_status("idle")
@@ -218,6 +220,7 @@ class RalphLoop:
                 )
 
                 # --- Run Claude ---
+                logger.info("Project %s: starting Claude for issue %s (prompt: %d chars)", self.project_name, self.current_issue_id, len(prompt))
                 self.process = await asyncio.create_subprocess_exec(
                     "claude", "-p",
                     "--model", "opus",
@@ -239,6 +242,7 @@ class RalphLoop:
                 # Wait for exit
                 await self.process.wait()
                 exit_code = self.process.returncode
+                logger.info("Project %s: Claude exited with code %d", self.project_name, exit_code)
 
                 if exit_code != 0:
                     await self._recover(self.current_issue_id)
@@ -428,6 +432,9 @@ class RalphLoop:
             # Try to parse stream-json and extract readable content
             display_line = self._parse_stream_line(raw)
             if not display_line:
+                # Log unparsed non-empty lines for debugging
+                if raw and not raw.startswith("{"):
+                    logger.debug("Unparsed non-JSON line: %s", raw[:200])
                 continue
 
             self.stdout_lines.append(display_line)
