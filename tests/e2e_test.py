@@ -225,6 +225,44 @@ def test_chat_persistence(page: Page):
         delete_project_api(project_name)
 
 
+def test_upload_preview(page: Page):
+    """Upload a text file and verify it can be previewed in the Uploads tab."""
+    project_name = f"e2e-upload-{int(time.time())}"
+
+    try:
+        create_project_api(project_name)
+
+        page.goto(f"{BASE_URL}/project/{project_name}")
+        page.wait_for_load_state("domcontentloaded")
+
+        page.locator(".chat-msg.assistant").first.wait_for(state="visible", timeout=60000)
+        page.wait_for_function(
+            "() => !document.getElementById('chat-input').disabled",
+            timeout=60000,
+        )
+
+        page.click("button[data-tab='uploads']")
+        page.locator("#upload-list").wait_for(state="visible", timeout=10000)
+
+        page.locator("#upload-file-input").set_input_files({
+            "name": "notes.md",
+            "mimeType": "text/markdown",
+            "buffer": b"# Preview test\n\nThis file should render in the preview pane.",
+        })
+
+        file_name = page.locator(".upload-item .file-name", has_text="notes.md")
+        file_name.wait_for(state="visible", timeout=10000)
+        file_name.click()
+
+        preview_text = page.locator(".upload-inline-preview pre")
+        preview_text.wait_for(state="visible", timeout=5000)
+        assert "Preview test" in preview_text.inner_text()
+        assert "render in the preview pane" in preview_text.inner_text()
+
+    finally:
+        delete_project_api(project_name)
+
+
 def test_project_delete(page: Page):
     """Create project, verify it shows on dashboard, delete it, verify it's gone."""
     project_name = f"e2e-del-{int(time.time())}"
