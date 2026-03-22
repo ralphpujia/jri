@@ -20,6 +20,13 @@ SECRET_KEY: str = os.environ.get("SECRET_KEY", "")
 STRIPE_SECRET_KEY: str = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_PUBLISHABLE_KEY: str = os.environ.get("STRIPE_PUBLISHABLE_KEY", "")
 
+X402_PAY_TO_ADDRESS: str = os.environ.get("X402_PAY_TO_ADDRESS", "")
+X402_FACILITATOR_URL: str = os.environ.get(
+    "X402_FACILITATOR_URL", "https://x402.org/facilitator"
+)
+X402_NETWORK: str = os.environ.get("X402_NETWORK", "eip155:84532")
+X402_RALPH_PRICE_USD: str = os.environ.get("X402_RALPH_PRICE_USD", "$20.00")
+
 # Base URL (used for OAuth callbacks, Stripe redirects, etc.)
 BASE_URL: str = os.environ.get("BASE_URL", "https://justralph.it")
 
@@ -56,4 +63,9 @@ if _missing:
 if not STRIPE_SECRET_KEY:
     logging.getLogger(__name__).warning(
         "STRIPE_SECRET_KEY not set — Stripe payments will not work"
+    )
+
+if not X402_PAY_TO_ADDRESS:
+    logging.getLogger(__name__).info(
+        "X402_PAY_TO_ADDRESS not set — x402 payments are disabled"
     )

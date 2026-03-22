@@ -8,3 +8,4 @@ python-multipart==0.0.9
 jinja2==3.1.4
 markdown==3.7
 stripe==10.0.0
+x402[evm,fastapi]==2.5.0

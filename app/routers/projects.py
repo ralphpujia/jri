@@ -13,6 +13,7 @@ from pydantic import BaseModel
 from app.auth_utils import get_current_user
 from app.config import DATA_DIR, RALPH_BOT_GITHUB_TOKEN
 from app.database import get_db
+from app.x402 import x402_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -439,6 +440,9 @@ async def create_project(
             (user_id, name, description, github_repo_url),
         )
         project_id = cursor.lastrowid
+        if project_id is None:
+            raise HTTPException(status_code=500, detail="Failed to create project")
+        project_id = int(project_id)
         deploy_port = 9000 + project_id
         deploy_subdomain = name.lower()
         await db.execute(
@@ -571,7 +575,8 @@ async def get_project(name: str, user: dict = Depends(get_current_user)):
         cursor = await db.execute(
             "SELECT id, name, description, github_repo_url, ralph_session_id, "
             "ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration, "
-            "deploy_type, deploy_port, deploy_status, deploy_subdomain, created_at "
+            "deploy_type, deploy_port, deploy_status, deploy_subdomain, "
+            "payment_provider, paid_at, created_at "
             "FROM projects WHERE user_id = ? AND name = ?",
             (user_id, name),
         )
@@ -598,6 +603,9 @@ async def get_project(name: str, user: dict = Depends(get_current_user)):
         "deploy_port": row_dict["deploy_port"],
         "deploy_status": row_dict["deploy_status"],
         "deploy_subdomain": row_dict["deploy_subdomain"],
+        "payment_provider": row_dict["payment_provider"],
+        "paid_at": row_dict["paid_at"],
+        "x402_enabled": x402_enabled(),
         "created_at": row_dict["created_at"],
     }
 

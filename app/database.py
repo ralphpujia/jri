@@ -54,6 +54,8 @@ async def init_db() -> None:
                 ralph_loop_current_issue TEXT,
                 ralph_loop_iteration INTEGER NOT NULL DEFAULT 0,
                 stripe_payment_id TEXT,
+                payment_provider TEXT,
+                paid_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 UNIQUE(user_id, name)
             )
@@ -81,6 +83,8 @@ async def init_db() -> None:
             ("deploy_status", "TEXT DEFAULT 'idle'"),
             ("deploy_start_command", "TEXT DEFAULT NULL"),
             ("deploy_subdomain", "TEXT DEFAULT NULL"),
+            ("payment_provider", "TEXT DEFAULT NULL"),
+            ("paid_at", "TEXT DEFAULT NULL"),
         ]
         for col_name, col_def in _deploy_columns:
             try:
