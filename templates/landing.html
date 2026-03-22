@@ -1,52 +1,52 @@
 {% extends "base.html" %}
 
-{% block title %}Just Ralph It{% endblock %}
+{% block title %}JUSTRALPH.IT{% endblock %}
+
+{% block body_attrs %} class="landing"{% endblock %}
 
 {% block head %}
-<style>
-    .landing-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        min-height: 100vh;
-        max-width: 600px;
-        margin: 0 auto;
-        padding: 1rem;
-        text-align: center;
-    }
-    .landing-container h1 {
-        font-size: 2.5rem;
-        margin-bottom: 1rem;
-    }
-    .landing-container p {
-        font-size: 1.1rem;
-        line-height: 1.6;
-        margin-bottom: 2rem;
-        color: var(--text);
-    }
-    .btn-github {
-        display: inline-block;
-        padding: 0.75rem 1.5rem;
-        border: 1px solid var(--text);
-        background: transparent;
-        color: var(--text-bright);
-        font-size: 1rem;
-        text-decoration: none;
-        border-radius: 4px;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-    .btn-github:hover {
-        background-color: var(--hover-bg);
-    }
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/css/landing.css">
 {% endblock %}
 
 {% block content %}
-<div class="landing-container">
-    <h1>Just Ralph It</h1>
-    <p>Transform your software idea into a very detailed plan and let an AI agent build it entirely.</p>
-    <a href="/auth/login" class="btn-github">Sign in with GitHub</a>
+<div id="bouncing-logo-container" class="landing-fullscreen landing-grid-bg landing-scanline">
+    <!-- Bouncing Logo -->
+    <img id="bouncing-logo"
+         src="/static/img/ralph-logo.png"
+         alt=""
+         aria-hidden="true"
+         class="bouncing-logo"
+         width="720">
+
+    <!-- Theme Toggle -->
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme">&#9790;</button>
+
+    <!-- Central Card -->
+    <div class="landing-card">
+        <span class="red-accent" aria-hidden="true"></span>
+
+        <!-- Title Section -->
+        <div class="title-section">
+            <div class="bracket-wrapper">
+                <span class="bracket-corner bracket-tl" aria-hidden="true"></span>
+                <span class="bracket-corner bracket-tr" aria-hidden="true"></span>
+                <span class="bracket-corner bracket-bl" aria-hidden="true"></span>
+                <span class="bracket-corner bracket-br" aria-hidden="true"></span>
+                <h1 class="landing-title glitch-text terminal-glow">JUSTRALPH.IT</h1>
+            </div>
+            <p class="landing-subtitle">FROM IDEA TO CODE</p>
+            <p class="landing-tagline">DESCRIBE YOUR PROJECT. RALPH BUILDS IT.</p>
+        </div>
+
+        <!-- Actions -->
+        <div class="landing-actions">
+            <a href="/auth/login" class="btn-login">LOGIN WITH GITHUB</a>
+        </div>
+    </div>
 </div>
+
+<script src="/static/js/landing.js"></script>
 {% endblock %}

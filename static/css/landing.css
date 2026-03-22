@@ -1,0 +1,341 @@
+/* ==========================================================================
+   Landing Page Styles — scoped under body.landing
+   ========================================================================== */
+
+/* -- Dark mode (default) ------------------------------------------------- */
+body.landing {
+    --landing-bg: #000000;
+    --landing-card-bg: #0a0a0a;
+    --landing-text: #e0e0e0;
+    --landing-text-bright: #fff;
+    --landing-text-muted: #666;
+    --landing-green: #00FF41;
+    --landing-green-hover: #00cc33;
+    --landing-red: #FF0033;
+    --landing-border: #333;
+    --landing-font: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    margin: 0;
+    padding: 0;
+    background-color: var(--landing-bg);
+    color: var(--landing-text);
+    font-family: var(--landing-font);
+}
+
+/* -- Light mode (toggled via JS) ----------------------------------------- */
+body.landing.light {
+    --landing-bg: #f5f5f0;
+    --landing-card-bg: #ffffff;
+    --landing-text: #1a1a1a;
+    --landing-text-bright: #000;
+    --landing-text-muted: #666;
+    --landing-green: #006b1f;
+    --landing-green-hover: #005518;
+    --landing-red: #cc0029;
+    --landing-border: #ccc;
+}
+
+/* ==========================================================================
+   Full-screen container
+   ========================================================================== */
+.landing-fullscreen {
+    position: relative;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: var(--landing-bg);
+}
+
+/* ==========================================================================
+   Grid background
+   ========================================================================== */
+.landing-grid-bg {
+    background-image:
+        linear-gradient(rgba(0, 255, 65, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 65, 0.04) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+body.landing.light .landing-grid-bg {
+    background-image:
+        linear-gradient(rgba(0, 107, 31, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 107, 31, 0.06) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+/* ==========================================================================
+   CRT Scanline overlay
+   ========================================================================== */
+.landing-scanline::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 255, 65, 0.03) 2px,
+        rgba(0, 255, 65, 0.03) 4px
+    );
+    pointer-events: none;
+    z-index: 50;
+}
+
+body.landing.light .landing-scanline::after {
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 107, 31, 0.02) 2px,
+        rgba(0, 107, 31, 0.02) 4px
+    );
+}
+
+/* ==========================================================================
+   Bouncing logo
+   ========================================================================== */
+.bouncing-logo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 720px;
+    height: auto;
+    object-fit: contain;
+    opacity: 0.85;
+    pointer-events: none;
+    z-index: 5;
+    will-change: transform;
+}
+
+/* ==========================================================================
+   Theme toggle button
+   ========================================================================== */
+.theme-toggle {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 20;
+    background: none;
+    border: none;
+    color: var(--landing-green);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.5rem;
+    line-height: 1;
+    transition: opacity 0.2s;
+}
+
+.theme-toggle:hover {
+    opacity: 0.7;
+}
+
+/* ==========================================================================
+   Central card
+   ========================================================================== */
+.landing-card {
+    position: relative;
+    z-index: 10;
+    border: 2px solid var(--landing-green);
+    background-color: var(--landing-card-bg);
+    padding: 2.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    text-align: center;
+    min-width: 340px;
+    max-width: 24rem;
+}
+
+/* Red accent square (top-right corner of card) */
+.red-accent {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    background-color: var(--landing-red);
+}
+
+/* ==========================================================================
+   Title section
+   ========================================================================== */
+.title-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+/* Corner bracket decoration wrapper */
+.bracket-wrapper {
+    position: relative;
+    padding: 0.75rem 1.25rem;
+}
+
+.bracket-corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--landing-green);
+    border-style: solid;
+}
+
+.bracket-tl {
+    top: 0;
+    left: 0;
+    border-width: 2px 0 0 2px;
+}
+
+.bracket-tr {
+    top: 0;
+    right: 0;
+    border-width: 2px 2px 0 0;
+}
+
+.bracket-bl {
+    bottom: 0;
+    left: 0;
+    border-width: 0 0 2px 2px;
+}
+
+.bracket-br {
+    bottom: 0;
+    right: 0;
+    border-width: 0 2px 2px 0;
+}
+
+/* Title text */
+.landing-title {
+    font-size: 3rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--landing-text-bright);
+    margin: 0;
+    padding: 0 0.5rem;
+    font-family: var(--landing-font);
+}
+
+/* Subtitle (green, small caps) */
+.landing-subtitle {
+    color: var(--landing-green);
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+    font-family: var(--landing-font);
+}
+
+/* Tagline (muted, extra small) */
+.landing-tagline {
+    color: var(--landing-text-muted);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
+    font-family: var(--landing-font);
+}
+
+/* ==========================================================================
+   Terminal glow (green text-shadow)
+   ========================================================================== */
+.terminal-glow {
+    text-shadow: 0 0 6px rgba(0, 255, 65, 0.4);
+}
+
+body.landing.light .terminal-glow {
+    text-shadow: 0 0 6px rgba(0, 107, 31, 0.25);
+}
+
+/* ==========================================================================
+   Glitch hover animation
+   ========================================================================== */
+@keyframes glitch {
+    0%, 100% {
+        transform: translate(0);
+    }
+    20% {
+        transform: translate(-2px, 1px) skewX(-1deg);
+    }
+    40% {
+        transform: translate(1px, -1px);
+    }
+    60% {
+        transform: translate(-1px, 0) skewX(1deg);
+    }
+    80% {
+        transform: translate(2px, 1px);
+    }
+}
+
+.glitch-text:hover {
+    animation: glitch 0.3s ease-in-out;
+}
+
+/* ==========================================================================
+   Actions / Login button
+   ========================================================================== */
+.landing-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.btn-login {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid var(--landing-green);
+    background: transparent;
+    color: var(--landing-green);
+    font-size: 0.875rem;
+    font-weight: 700;
+    font-family: var(--landing-font);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.2s, color 0.2s;
+    box-sizing: border-box;
+}
+
+.btn-login:hover {
+    background-color: var(--landing-green);
+    color: var(--landing-bg);
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+@media (max-width: 640px) {
+    .bouncing-logo {
+        display: none;
+    }
+
+    .landing-card {
+        min-width: 0;
+        margin: 1rem;
+        padding: 1.5rem;
+    }
+
+    .landing-title {
+        font-size: 2rem;
+        letter-spacing: 0.1em;
+    }
+
+    .landing-subtitle {
+        font-size: 0.75rem;
+    }
+
+    .landing-tagline {
+        font-size: 0.625rem;
+    }
+}
