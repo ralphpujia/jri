@@ -432,6 +432,44 @@
         display: inline-block;
         flex-shrink: 0;
     }
+    .status-dot-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px;
+        margin: -6px;
+        flex-shrink: 0;
+    }
+    .status-dot-wrap::after {
+        content: attr(data-status-label);
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 6px);
+        transform: translateX(-50%);
+        padding: 0.25rem 0.45rem;
+        border-radius: 4px;
+        background: rgba(17, 21, 27, 0.96);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text-muted);
+        font-size: 0.72rem;
+        line-height: 1;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease;
+        z-index: 10;
+    }
+    .status-dot-wrap:hover::after,
+    .status-dot-wrap:focus-visible::after {
+        opacity: 1;
+    }
+    .status-dot-wrap-epic::after {
+        left: 0;
+        top: calc(100% + 6px);
+        bottom: auto;
+        transform: none;
+    }
     .status-dot.closed { background: #4caf50; }
     .status-dot.in_progress { background: #e8a820; }
     .status-dot.open { background: var(--text-dim); }
@@ -1626,14 +1664,24 @@
             .catch(function() {});
     }
 
-    function statusDotHtml(status) {
+    function statusDotHtml(status, variant) {
         console.log('Rendering status dot for status:', status);
         var cls = 'status-dot';
+        var wrapCls = 'status-dot-wrap';
+        var label = 'Open';
         if (status === 'closed') cls += ' closed';
-        else if (status === 'in_progress') cls += ' in_progress';
-        else if (status === 'deferred') cls += ' deferred';
+        else if (status === 'in_progress') {
+            cls += ' in_progress';
+            label = 'In progress';
+        }
+        else if (status === 'deferred') {
+            cls += ' deferred';
+            label = 'Deferred';
+        }
         else cls += ' open';
-        return '<span class="' + cls + '"></span>';
+        if (status === 'closed') label = 'Closed';
+        if (variant === 'epic') wrapCls += ' status-dot-wrap-epic';
+        return '<span class="' + wrapCls + '" data-status-label="' + label + '" aria-label="Status: ' + label + '" tabindex="0"><span class="' + cls + '"></span></span>';
     }
 
     function renderIssues(data) {
@@ -1651,7 +1699,7 @@
 
             var header = document.createElement('div');
             header.className = 'epic-header';
-            header.innerHTML = statusDotHtml(epic.status) + ' ' + escapeHtml(epic.title || epic.id);
+            header.innerHTML = statusDotHtml(epic.status, 'epic') + ' ' + escapeHtml(epic.title || epic.id);
             section.appendChild(header);
 
             (epic.children || []).forEach(function(issue) {
