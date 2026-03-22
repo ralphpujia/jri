@@ -302,6 +302,12 @@ async def create_project(
                 f"bd init failed after 3 attempts: {last_bd_init_error}"
             )
 
+        # 4b. Install beads git hooks (auto-commit issues to repo)
+        logger.info(f"Creating project {name}: step 4b - bd hooks install")
+        rc, _, err = await _run(["bd", "hooks", "install"], cwd=cwd)
+        if rc != 0:
+            logger.warning("bd hooks install failed (rc=%d): %s", rc, err)
+
         # 5. Create AGENTS.md
         logger.info(f"Creating project {name}: step 5 - creating AGENTS.md")
         agents_md = (
