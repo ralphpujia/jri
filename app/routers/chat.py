@@ -149,49 +149,63 @@ async def _stream_claude(
     await sse_bus.publish(project_name, "ralphy_processing", {"status": "start"})
 
     try:
-        proc = await asyncio.create_subprocess_exec(
-            *args,
-            cwd=project_dir,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, **env},
-        )
+        got_result = False
+        max_attempts = 2
 
-        async for raw_line in proc.stdout:
-            line = raw_line.decode().strip()
-            if not line:
+        for attempt in range(max_attempts):
+            proc = await asyncio.create_subprocess_exec(
+                *args,
+                cwd=project_dir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                env={**os.environ, **env},
+            )
+
+            async for raw_line in proc.stdout:
+                line = raw_line.decode().strip()
+                if not line:
+                    continue
+
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                msg_type = data.get("type")
+
+                if msg_type == "content_block_start":
+                    content_block = data.get("content_block", {})
+                    if content_block.get("type") == "tool_use":
+                        event = {"type": "tool_use", "name": content_block["name"], "input": content_block.get("input", {})}
+                        yield f"data: {json.dumps(event)}\n\n"
+
+                elif msg_type == "content_block_delta":
+                    delta = data.get("delta", {})
+                    if delta.get("type") == "text_delta":
+                        event = {"type": "text", "content": delta["text"]}
+                        yield f"data: {json.dumps(event)}\n\n"
+                    elif delta.get("type") == "thinking_delta":
+                        event = {"type": "thinking", "content": delta["thinking"]}
+                        yield f"data: {json.dumps(event)}\n\n"
+
+                elif msg_type == "result":
+                    result_text = data.get("result", "")
+                    event = {"type": "done", "result": result_text}
+                    yield f"data: {json.dumps(event)}\n\n"
+                    got_result = True
+
+            await proc.wait()
+
+            if got_result or proc.returncode == 0:
+                break
+
+            # Non-zero exit with no result — retry once
+            if attempt < max_attempts - 1:
+                stderr_bytes = await proc.stderr.read()
+                last_stderr = stderr_bytes.decode().strip()
                 continue
 
-            try:
-                data = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-
-            msg_type = data.get("type")
-
-            if msg_type == "content_block_start":
-                content_block = data.get("content_block", {})
-                if content_block.get("type") == "tool_use":
-                    event = {"type": "tool_use", "name": content_block["name"], "input": content_block.get("input", {})}
-                    yield f"data: {json.dumps(event)}\n\n"
-
-            elif msg_type == "content_block_delta":
-                delta = data.get("delta", {})
-                if delta.get("type") == "text_delta":
-                    event = {"type": "text", "content": delta["text"]}
-                    yield f"data: {json.dumps(event)}\n\n"
-                elif delta.get("type") == "thinking_delta":
-                    event = {"type": "thinking", "content": delta["thinking"]}
-                    yield f"data: {json.dumps(event)}\n\n"
-
-            elif msg_type == "result":
-                result_text = data.get("result", "")
-                event = {"type": "done", "result": result_text}
-                yield f"data: {json.dumps(event)}\n\n"
-
-        await proc.wait()
-
-        if proc.returncode != 0:
+            # Final attempt failed
             stderr_bytes = await proc.stderr.read()
             stderr_text = stderr_bytes.decode().strip()
             event = {
