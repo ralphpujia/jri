@@ -219,13 +219,39 @@
 
     .thinking-indicator {
         align-self: flex-start;
-        color: var(--text-dim);
         font-style: italic;
         font-size: 0.85rem;
         padding: 0.4rem 0;
         display: none;
+        color: rgba(230, 232, 235, 0.38);
+        background-image: linear-gradient(
+            90deg,
+            rgba(230, 232, 235, 0.38) 0%,
+            rgba(230, 232, 235, 0.38) 42%,
+            rgba(245, 247, 250, 0.82) 50%,
+            rgba(230, 232, 235, 0.38) 58%,
+            rgba(230, 232, 235, 0.38) 100%
+        );
+        background-size: 320% 100%;
+        background-position: 160% 0;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        will-change: background-position;
     }
-    .thinking-indicator.visible { display: block; }
+    .thinking-indicator.visible {
+        display: block;
+        animation: thinking-wave 2.3s linear infinite;
+    }
+
+    @keyframes thinking-wave {
+        from {
+            background-position: 160% 0;
+        }
+        to {
+            background-position: -60% 0;
+        }
+    }
 
     /* ── Chat input ── */
     .chat-controls {
