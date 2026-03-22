@@ -71,14 +71,13 @@ def _build_claude_args(
     if is_new_session:
         args += ["--session-id", session_id]
     else:
-        args += ["--resume", session_id]
+        args += ["--resume", session_id, "--continue"]
 
     args += [
         "--system-prompt", RALPHY_SYSTEM_PROMPT,
         "--output-format", "stream-json",
         "--verbose",
         "--allowedTools", ALLOWED_TOOLS,
-        "--continue",
         "--", user_message,
     ]
     return args

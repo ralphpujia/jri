@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import shutil
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
@@ -253,6 +255,18 @@ async def create_project(
 
         # 4. bd init (with retry — shared Dolt server may need a moment)
         logger.info(f"Creating project {name}: step 4 - bd init")
+        # Ensure shared Dolt server is running before attempting bd init
+        shared_pid_file = Path.home() / ".beads" / "shared-server" / "dolt-server.pid"
+        server_alive = False
+        if shared_pid_file.exists():
+            try:
+                pid = int(shared_pid_file.read_text().strip())
+                os.kill(pid, 0)
+                server_alive = True
+            except (ValueError, OSError):
+                pass
+        if not server_alive:
+            await _run(["bd", "dolt", "start"], cwd=str(Path.home()), timeout=30)
         last_bd_init_error = ""
         for attempt in range(3):
             try:
