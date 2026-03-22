@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.auth_utils import create_session_token
 
-BASE_URL = "https://justralph.it"
+BASE_URL = "http://localhost:8001"
 TEST_USER_ID = 1  # nicopujia — must exist in the production database
 
 
@@ -32,7 +32,7 @@ def delete_project_api(name: str):
     """Delete a project via the API (cleanup helper)."""
     token = get_session_cookie_value()
     with httpx.Client(base_url=BASE_URL, cookies={"session": token}, timeout=30) as client:
-        resp = client.delete(f"/api/projects/{name}?delete_repo=true")
+        resp = client.delete(f"/api/projects/{name}?delete_repo=false")
         assert resp.status_code in (204, 404), f"Delete failed: {resp.status_code} {resp.text}"
 
 
@@ -73,7 +73,7 @@ def page(browser):
     context.add_cookies([{
         "name": "session",
         "value": token,
-        "domain": "justralph.it",
+        "domain": "localhost",
         "path": "/",
         "httpOnly": False,
         "secure": True,
@@ -277,6 +277,12 @@ def test_project_delete(page: Page):
         # Wait for projects to load
         project_card = page.locator(f".project-card[data-name='{project_name}']")
         project_card.wait_for(state="visible", timeout=15000)
+
+        # Intercept the delete request to skip GitHub repo deletion in tests
+        page.route(
+            f"**/api/projects/{project_name}**",
+            lambda route: route.continue_(url=route.request.url.replace("delete_repo=true", "delete_repo=false")),
+        )
 
         # Click delete and accept confirm dialog
         page.on("dialog", lambda dialog: dialog.accept())
