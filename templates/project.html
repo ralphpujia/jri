@@ -1433,6 +1433,8 @@
                         jriBtn.style.background = 'var(--border-light)';
                         jriBtn.style.color = 'var(--text-dim)';
                         refreshProject();
+                        activateTab('ralph');
+                        history.replaceState(null, '', '#ralph');
                     } else if (data.redirect) {
                         window.location.href = data.redirect;
                     }
@@ -2227,9 +2229,12 @@
 
         scrollChat();
 
-        // 1d. Activate tab from URL hash
+        // 1d. Activate tab from URL hash or payment success
         var initialHash = window.location.hash;
-        if (initialHash && hashToTab[initialHash]) {
+        if (window.location.search.indexOf('payment=success') !== -1) {
+            activateTab('ralph');
+            history.replaceState(null, '', '#ralph');
+        } else if (initialHash && hashToTab[initialHash]) {
             activateTab(hashToTab[initialHash]);
         }
 
