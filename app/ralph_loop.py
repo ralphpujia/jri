@@ -276,6 +276,9 @@ class RalphLoop:
                 check_out, _ = await check_proc.communicate()
                 try:
                     issue_data = json.loads(check_out.decode())
+                    # bd show --json may return a list or a dict
+                    if isinstance(issue_data, list):
+                        issue_data = issue_data[0] if issue_data else {}
                     if issue_data.get("status") != "closed":
                         logger.warning(
                             "Issue %s was not closed by Ralph after iteration %d",

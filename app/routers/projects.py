@@ -83,7 +83,7 @@ async def list_issues(
     """List all issues in a project, grouped by parent epic."""
     cwd = await _get_project_dir(name, user)
 
-    rc, stdout, _ = await _run(["bd", "list", "--json"], cwd=cwd)
+    rc, stdout, _ = await _run(["bd", "list", "--all", "--json"], cwd=cwd)
     if rc != 0:
         return {"epics": [], "ungrouped": []}
 
@@ -98,7 +98,7 @@ async def list_issues(
     _FIELDS = (
         "id",
         "title",
-        "type",
+        "issue_type",
         "status",
         "priority",
         "description",
@@ -117,7 +117,7 @@ async def list_issues(
     # First pass: identify epics (type == "epic" or has children via dotted ids)
     for issue in issues:
         iid = issue.get("id", "")
-        if issue.get("type") == "epic" or (
+        if issue.get("issue_type") == "epic" or (
             "." not in iid
             and any(
                 other.get("id", "").startswith(iid + ".")
