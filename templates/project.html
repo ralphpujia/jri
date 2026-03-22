@@ -355,6 +355,7 @@
         font-size: 0.85rem;
         font-weight: 500;
         transition: color 0.15s, border-color 0.15s;
+        text-decoration: none;
     }
     .tab-btn:hover { color: var(--text-muted); }
     .tab-btn.active {
@@ -695,11 +696,11 @@
     <!-- Right panel: Tabs -->
     <div class="right-panel">
         <div class="tab-bar">
-            <button class="tab-btn active" data-tab="agents-md">Overview</button>
-            <button class="tab-btn" data-tab="issues">Issues</button>
-            <button id="tab-btn-ralph" class="tab-btn" data-tab="ralph">Ralph</button>
-            <button class="tab-btn" data-tab="uploads">Uploads</button>
-            <button class="tab-btn" data-tab="env">Env</button>
+            <a href="#overview" class="tab-btn active" data-tab="agents-md">Overview</a>
+            <a href="#issues" class="tab-btn" data-tab="issues">Issues</a>
+            <a href="#ralph" id="tab-btn-ralph" class="tab-btn" data-tab="ralph">Ralph</a>
+            <a href="#uploads" class="tab-btn" data-tab="uploads">Uploads</a>
+            <a href="#env" class="tab-btn" data-tab="env">Env</a>
             <div style="flex:1;"></div>
             <div id="ralph-controls" class="ralph-controls">
                 <button id="btn-ralph-stop" class="ralph-ctrl-btn" title="Stop Ralph" disabled>&#9209;</button>
@@ -841,6 +842,9 @@
 
         // Italic
         s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+        // Strikethrough
+        s = s.replace(/~~(.+?)~~/g, '<del>$1</del>');
 
         // Links
         s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
@@ -1117,8 +1121,14 @@
                 var thinkingSteps = [];
                 var thinkingText = '';
                 var hasContent = false;
+                function savePendingMessage() {
+                    var pending = { thinkingText: thinkingText, thinkingSteps: thinkingSteps, fullText: fullText, interleaveText: interleaveText };
+                    try { localStorage.setItem(STORAGE_KEY + '-pending', JSON.stringify(pending)); } catch(e) {}
+                }
+
                 function rebuildMsg() {
                     if (!msgDiv) return;
+                    savePendingMessage();
                     // Preserve <details> open state across rebuilds
                     var existingDetails = msgDiv.querySelector('details.thinking');
                     var wasOpen = existingDetails ? existingDetails.open : true;
@@ -1156,6 +1166,7 @@
                 function pump() {
                     return reader.read().then(function(result) {
                         if (result.done) {
+                            localStorage.removeItem(STORAGE_KEY + '-pending');
                             if (fullText) appendToHistory('assistant', fullText);
                             setProcessing(false);
                             checkJriVisibility(fullText);
@@ -1210,6 +1221,7 @@
                                 scrollChat();
                             } else if (evt.type === 'done') {
                                 if (evt.result) fullText = evt.result;
+                                localStorage.removeItem(STORAGE_KEY + '-pending');
                                 ensureMsgDiv();
                                 rebuildMsg();
                                 // Refresh issues and AGENTS.md after Ralphy finishes
@@ -1352,18 +1364,33 @@
     var tabBtns = document.querySelectorAll('.tab-btn');
     var tabPanes = document.querySelectorAll('.tab-pane');
 
-    tabBtns.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            var tab = btn.dataset.tab;
-            tabBtns.forEach(function(b) { b.classList.remove('active'); });
-            tabPanes.forEach(function(p) { p.classList.remove('active'); });
-            btn.classList.add('active');
-            document.getElementById('tab-' + tab).classList.add('active');
+    var hashToTab = { '#overview': 'agents-md', '#issues': 'issues', '#ralph': 'ralph', '#uploads': 'uploads', '#env': 'env' };
 
-            // Lazy-load data on tab activation
-            if (tab === 'agents-md') fetchAgentsMd();
-            if (tab === 'uploads') fetchUploads();
-            if (tab === 'env') fetchEnv();
+    function activateTab(tab) {
+        tabBtns.forEach(function(b) { b.classList.remove('active'); });
+        tabPanes.forEach(function(p) { p.classList.remove('active'); });
+        var targetBtn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+        if (targetBtn) targetBtn.classList.add('active');
+        var targetPane = document.getElementById('tab-' + tab);
+        if (targetPane) targetPane.classList.add('active');
+
+        // Lazy-load data on tab activation
+        if (tab === 'agents-md') fetchAgentsMd();
+        if (tab === 'uploads') fetchUploads();
+        if (tab === 'env') fetchEnv();
+    }
+
+    tabBtns.forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var tab = btn.dataset.tab;
+            activateTab(tab);
+
+            // Update hash without scrolling
+            var tabToHash = {};
+            Object.keys(hashToTab).forEach(function(h) { tabToHash[hashToTab[h]] = h; });
+            var hash = tabToHash[tab] || '#overview';
+            history.replaceState(null, '', hash);
         });
     });
 
@@ -1863,12 +1890,31 @@
             addChatMessage(msg.role, renderMarkdown(msg.content));
         });
 
-        // 1b. Restore JRI button if flag was set (by bd update --status open detection)
+        // 1b. Restore pending message from interrupted stream
+        var pendingRaw = localStorage.getItem(STORAGE_KEY + '-pending');
+        if (pendingRaw) {
+            try {
+                var pending = JSON.parse(pendingRaw);
+                if (pending.fullText) {
+                    appendToHistory('assistant', pending.fullText);
+                    addChatMessage('assistant', renderMarkdown(pending.fullText));
+                }
+                localStorage.removeItem(STORAGE_KEY + '-pending');
+            } catch(e) {}
+        }
+
+        // 1c. Restore JRI button if flag was set (by bd update --status open detection)
         if (localStorage.getItem(STORAGE_KEY + '-jri') === 'true') {
             showJriButton();
         }
 
         scrollChat();
+
+        // 1d. Activate tab from URL hash
+        var initialHash = window.location.hash;
+        if (initialHash && hashToTab[initialHash]) {
+            activateTab(hashToTab[initialHash]);
+        }
 
         // 2. Auto-send description if first visit (no history and no existing session)
         if (history.length === 0 && !PROJECT_HAS_SESSION && PROJECT_DESCRIPTION) {
