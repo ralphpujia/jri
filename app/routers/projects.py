@@ -311,12 +311,7 @@ async def create_project(
             f"\n"
             f"## Project Info\n"
             f"- Repository: {github_repo_url}\n"
-            f"- Created by: {github_username}\n"
-            f"\n"
-            f"## Deployment\n"
-            f"- This project will be deployed to: https://{name}.justralph.it\n"
-            f"- For dynamic apps: the app MUST listen on host 127.0.0.1 and port from the PORT environment variable\n"
-            f"- For static sites: build output should be in dist/, build/, or public/\n"
+            f"- Created by: {github_username}"
         )
         (project_dir / "AGENTS.md").write_text(agents_md)
 
