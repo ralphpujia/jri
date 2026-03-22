@@ -1025,6 +1025,32 @@
         attachmentNames.textContent = files.map(function(f) { return f.name; }).join(', ');
     });
 
+    chatInput.addEventListener('paste', function(e) {
+        var items = e.clipboardData && e.clipboardData.files;
+        if (!items || items.length === 0) return; // Normal text paste
+
+        e.preventDefault();
+
+        var files = Array.from(items);
+
+        // Check total count (existing + new)
+        if (attachedFiles.length + files.length > 3) {
+            alert('Maximum 3 files allowed.');
+            return;
+        }
+
+        // Check size
+        var tooBig = files.filter(function(f) { return f.size > 3 * 1024 * 1024; });
+        if (tooBig.length > 0) {
+            alert('Each file must be under 3MB.');
+            return;
+        }
+
+        // Add to attachments
+        attachedFiles = attachedFiles.concat(files);
+        attachmentNames.textContent = attachedFiles.map(function(f) { return f.name; }).join(', ');
+    });
+
     function sendMessage() {
         var text = chatInput.value.trim();
         if (!text || ralphyProcessing) return;
