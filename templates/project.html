@@ -1506,6 +1506,11 @@
         }
 
         jriBtn.addEventListener('click', function() {
+            if (projectData && projectData.x402_enabled && !projectData.paid_at) {
+                window.location.href = API + '/ralph/start-x402';
+                return;
+            }
+
             jriBtn.disabled = true;
             jriBtn.textContent = 'Starting...';
             fetch(API + '/ralph/checkout', { method: 'POST' })

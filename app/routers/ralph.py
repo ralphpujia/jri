@@ -5,13 +5,14 @@ import json
 import logging
 
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
 
 from app.auth_utils import get_current_user
 from app.config import BASE_URL, DATA_DIR, STRIPE_SECRET_KEY
 from app.database import get_db
 from app.ralph_loop import RalphLoop
+from app.x402 import X402Authorization, authorize_x402_payment, x402_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,8 @@ async def _get_project(name: str, user: dict) -> dict:
     """Look up project by name for the authenticated user. Returns row dict."""
     async with get_db() as db:
         cursor = await db.execute(
-            "SELECT id, name, ralph_loop_status, ralph_loop_current_issue, ralph_loop_iteration, stripe_payment_id "
+            "SELECT id, name, ralph_loop_status, ralph_loop_current_issue, "
+            "ralph_loop_iteration, stripe_payment_id, payment_provider, paid_at "
             "FROM projects WHERE user_id = ? AND name = ?",
             (user["id"], name),
         )
@@ -63,10 +65,41 @@ async def _start_ralph_loop(name: str, project: dict, user: dict) -> None:
     await loop.start()
 
 
+def _has_paid_access(project: dict) -> bool:
+    return bool(project.get("paid_at"))
+
+
+async def _grant_paid_access(
+    project_id: int,
+    payment_provider: str,
+    stripe_payment_id: str | None = None,
+) -> None:
+    async with get_db() as db:
+        await db.execute(
+            "UPDATE projects SET payment_provider = ?, paid_at = datetime('now'), stripe_payment_id = COALESCE(?, stripe_payment_id) WHERE id = ?",
+            (payment_provider, stripe_payment_id, project_id),
+        )
+        await db.commit()
+
+
+def _require_paid_access(project: dict) -> None:
+    if _has_paid_access(project):
+        return
+    raise HTTPException(
+        status_code=402,
+        detail="Payment required. Use Stripe checkout or the x402 start endpoint first.",
+    )
+
+
 @router.post("/{name}/ralph/checkout")
 async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
     """Create a Stripe checkout session or grant free tier access."""
     project = await _get_project(name, user)
+
+    if _has_paid_access(project):
+        if name not in _loops or _loops[name].status != "running":
+            await _start_ralph_loop(name, project, user)
+        return {"free": True}
 
     # Create Stripe Checkout Session
     checkout_session = stripe.checkout.Session.create(
@@ -110,13 +143,7 @@ async def ralph_payment_callback(
     if session.client_reference_id != str(project["id"]):
         raise HTTPException(status_code=400, detail="Session does not match project")
 
-    # Store payment ID
-    async with get_db() as db:
-        await db.execute(
-            "UPDATE projects SET stripe_payment_id = ? WHERE id = ?",
-            (session_id, project["id"]),
-        )
-        await db.commit()
+    await _grant_paid_access(project["id"], "stripe", session_id)
 
     # Start Ralph loop
     await _start_ralph_loop(name, project, user)
@@ -124,10 +151,62 @@ async def ralph_payment_callback(
     return {"status": "started"}
 
 
+@router.api_route("/{name}/ralph/start-x402", methods=["GET", "POST"])
+async def ralph_start_x402(
+    name: str,
+    request: Request,
+    user: dict = Depends(get_current_user),
+):
+    if not x402_enabled():
+        raise HTTPException(status_code=503, detail="x402 is not configured")
+
+    project = await _get_project(name, user)
+    if name in _loops and _loops[name].status == "running":
+        if request.method == "GET":
+            return RedirectResponse(url=f"/project/{name}#ralph", status_code=303)
+        raise HTTPException(status_code=409, detail="Ralph loop is already running")
+
+    if _has_paid_access(project):
+        await _start_ralph_loop(name, project, user)
+        if request.method == "GET":
+            return RedirectResponse(url=f"/project/{name}#ralph", status_code=303)
+        return JSONResponse(
+            content={
+                "status": "running",
+                "payment_provider": project.get("payment_provider"),
+            }
+        )
+
+    authorization = await authorize_x402_payment(request)
+    if not isinstance(authorization, X402Authorization):
+        return authorization
+
+    await _grant_paid_access(project["id"], "x402")
+    await _start_ralph_loop(name, project, user)
+
+    if request.method == "GET":
+        response = RedirectResponse(url=f"/project/{name}#ralph", status_code=303)
+        for header, value in authorization.headers.items():
+            response.headers[header] = value
+        return response
+
+    return JSONResponse(
+        content={
+            "status": "running",
+            "payment_provider": "x402",
+            "payer": authorization.payer,
+            "network": authorization.network,
+            "transaction": authorization.transaction,
+        },
+        headers=authorization.headers,
+    )
+
+
 @router.post("/{name}/ralph/start")
 async def ralph_start(name: str, user: dict = Depends(get_current_user)):
     """Begin the Ralph loop for a project."""
     project = await _get_project(name, user)
+    _require_paid_access(project)
 
     if name in _loops and _loops[name].status == "running":
         raise HTTPException(status_code=409, detail="Ralph loop is already running")
