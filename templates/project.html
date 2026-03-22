@@ -1291,10 +1291,12 @@
             btnRalphStop.disabled = true;
             btnRalphResume.disabled = false;
         } else {
-            // idle
+            // idle — enable resume if there are any issues to work on
             btnRalphStop.disabled = true;
-            // Allow restart if Ralph has run before
-            btnRalphResume.disabled = !(projectData && projectData.ralph_loop_iteration > 0);
+            btnRalphResume.disabled = !(issuesData && (
+                (issuesData.epics && issuesData.epics.length > 0) ||
+                (issuesData.ungrouped && issuesData.ungrouped.length > 0)
+            ));
         }
     }
 
