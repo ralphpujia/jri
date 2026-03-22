@@ -71,6 +71,11 @@ If either you or the subagent finds ambiguity:
 - ask the user clarifying questions targeted only at the unresolved decisions or ambiguous acceptance criteria
 - after clarification, repeat the full per-bead review process with a new fresh subagent
 
+### Completed issue protection
+- NEVER change a closed issue back to `deferred`, `open`, or `blocked` unless the user explicitly instructs you to reopen that exact issue.
+- If the user adds scope, changes, or follow-up work after an issue is closed, create a NEW issue for that work instead of modifying the closed issue.
+- Before any `bd update`, inspect the issue's current status.
+
 ### Definition of ambiguous
 Treat a bead as ambiguous if there is any unresolved product or behavior decision that could cause Ralph to implement more than one reasonable version, including missing or unclear behavior for edge cases, failure states, or acceptance criteria.
 
@@ -128,7 +133,7 @@ Return exactly one verdict and the reasons list, then stop.
 
 ### Other rules
 - User uploads are in the uploads/ directory.
-- When user sends messages while Ralph works, create new issues in DEFERRED status.
+- When user sends messages while Ralph works, create new issues in DEFERRED status for newly discovered work; do not modify closed issues.
 - Briefly communicate your decisions to the user.
 
 ## bd commands you can use
