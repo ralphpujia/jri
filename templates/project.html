@@ -937,12 +937,27 @@
     function updateAttachmentDisplay() {
         var attachmentNames = document.getElementById('attachment-names');
         if (attachedFiles.length === 0) {
-            attachmentNames.innerHTML = '';
+            attachmentNames.textContent = '';
             return;
         }
-        var html = attachedFiles.map(function(f) { return f.name; }).join(', ');
-        html += ' <button onclick="clearAttachments()" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:0.9rem;padding:0 0.3rem;" title="Clear attachments">&times;</button>';
-        attachmentNames.innerHTML = html;
+
+        attachmentNames.textContent = attachedFiles.map(function(f) {
+            return f.name;
+        }).join(', ');
+
+        var clearBtn = document.createElement('button');
+        clearBtn.type = 'button';
+        clearBtn.style.background = 'none';
+        clearBtn.style.border = 'none';
+        clearBtn.style.color = 'var(--text-dim)';
+        clearBtn.style.cursor = 'pointer';
+        clearBtn.style.fontSize = '0.9rem';
+        clearBtn.style.padding = '0 0.3rem';
+        clearBtn.title = 'Clear attachments';
+        clearBtn.textContent = '×';
+        clearBtn.addEventListener('click', clearAttachments);
+        attachmentNames.appendChild(document.createTextNode(' '));
+        attachmentNames.appendChild(clearBtn);
     }
 
     function clearAttachments() {
