@@ -1391,8 +1391,9 @@
                 return pump();
             })
             .catch(function(err) {
+                console.error('Chat error:', err);
                 setProcessing(false);
-                addChatMessage('assistant', '<span style="color:#ff4444;">Failed to send message.</span>');
+                addChatMessage('assistant', '<span style="color:#ff4444;">Failed to send message: ' + (err.message || err) + '</span>');
             });
     }
 
