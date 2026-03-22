@@ -79,8 +79,45 @@ class RalphLoop:
         self._subscribers: set[asyncio.Queue] = set()
         self._task: Optional[asyncio.Task] = None
 
+    @staticmethod
+    async def check_interrupted(project_dir: str, project_name: str) -> None:
+        """Check if a previous loop was interrupted and clean up."""
+        state_path = Path(project_dir) / ".ralph_state"
+        if not state_path.exists():
+            return
+        try:
+            state = json.loads(state_path.read_text())
+            if state.get("status") == "running":
+                issue_id = state.get("current_issue_id")
+                logger.warning(
+                    "Found interrupted Ralph loop for %s on issue %s, recovering",
+                    project_name, issue_id,
+                )
+                # git reset --hard HEAD
+                reset_proc = await asyncio.create_subprocess_exec(
+                    "git", "reset", "--hard", "HEAD",
+                    cwd=project_dir,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                )
+                await reset_proc.communicate()
+                # Reopen the issue
+                if issue_id:
+                    reopen_proc = await asyncio.create_subprocess_exec(
+                        "bd", "update", issue_id, "--status", "open",
+                        cwd=project_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    await reopen_proc.communicate()
+                # Clean up state file
+                state_path.unlink(missing_ok=True)
+        except Exception:
+            logger.exception("Failed to recover interrupted loop for %s", project_name)
+
     async def start(self) -> None:
         """Set status to running and kick off the loop task."""
+        await self.check_interrupted(self.project_dir, self.project_name)
         self.status = "running"
         await self._update_db_status("running")
         self._task = asyncio.create_task(self._loop())
@@ -182,6 +219,7 @@ class RalphLoop:
 
                 if not issues:
                     self.status = "stopped"
+                    self._save_state()
                     await self._update_db_status("idle")
 
                     # --- Deploy if configured ---
@@ -201,98 +239,107 @@ class RalphLoop:
                 self._save_state()
                 await self._update_db_issue()
 
-                # --- Claim ---
-                await asyncio.create_subprocess_exec(
-                    "bd", "update", self.current_issue_id, "--claim",
-                    cwd=self.project_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                    env=self._env({"BD_ACTOR": "ralph"}),
-                )
-
-                # --- Clear stdout for new issue ---
-                self.stdout_lines.clear()
-                await sse_bus.publish(self.project_name, "ralph_stdout_clear", {})
-
-                # --- Build prompt ---
-                prompt = build_ralph_prompt(
-                    issue, self.user_github_name, self.user_github_email,
-                )
-
-                # --- Run Claude ---
-                logger.info("Project %s: starting Claude for issue %s (prompt: %d chars)", self.project_name, self.current_issue_id, len(prompt))
-                self.process = await asyncio.create_subprocess_exec(
-                    "claude", "-p",
-                    "--model", "opus",
-                    "--output-format", "stream-json",
-                    "--verbose",
-                    "--dangerously-skip-permissions",
-                    "--system-prompt", RALPH_SYSTEM_PROMPT,
-                    "--allowedTools", "Bash Read Write Edit Glob Grep WebFetch WebSearch",
-                    "--", prompt,
-                    cwd=self.project_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.STDOUT,
-                    env=self._env({"BD_ACTOR": "ralph"}),
-                )
-
-                # Stream stdout
-                await self._stream_process_output()
-
-                # Wait for exit
-                await self.process.wait()
-                exit_code = self.process.returncode
-                logger.info("Project %s: Claude exited with code %d", self.project_name, exit_code)
-
-                if exit_code != 0:
-                    await self._recover(self.current_issue_id)
-                    continue
-
-                # --- Push ---
-                push_proc = await asyncio.create_subprocess_exec(
-                    "git", "push",
-                    cwd=self.project_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                push_stdout, push_stderr = await push_proc.communicate()
-                if push_proc.returncode == 0:
-                    logger.info("Pushed changes to GitHub for issue %s", self.current_issue_id)
-                else:
-                    logger.warning(
-                        "git push failed for issue %s (exit %d): %s",
-                        self.current_issue_id,
-                        push_proc.returncode,
-                        push_stderr.decode(errors="replace").strip(),
+                try:
+                    # --- Claim ---
+                    await asyncio.create_subprocess_exec(
+                        "bd", "update", self.current_issue_id, "--claim",
+                        cwd=self.project_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                        env=self._env({"BD_ACTOR": "ralph"}),
                     )
 
-                # --- Check if issue was closed ---
-                check_proc = await asyncio.create_subprocess_exec(
-                    "bd", "show", self.current_issue_id, "--json",
-                    cwd=self.project_dir,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-                check_out, _ = await check_proc.communicate()
-                try:
-                    issue_data = json.loads(check_out.decode())
-                    # bd show --json may return a list or a dict
-                    if isinstance(issue_data, list):
-                        issue_data = issue_data[0] if issue_data else {}
-                    if issue_data.get("status") != "closed":
+                    # --- Clear stdout for new issue ---
+                    self.stdout_lines.clear()
+                    await sse_bus.publish(self.project_name, "ralph_stdout_clear", {})
+
+                    # --- Build prompt ---
+                    prompt = build_ralph_prompt(
+                        issue, self.user_github_name, self.user_github_email,
+                    )
+
+                    # --- Run Claude ---
+                    logger.info("Project %s: starting Claude for issue %s (prompt: %d chars)", self.project_name, self.current_issue_id, len(prompt))
+                    self.process = await asyncio.create_subprocess_exec(
+                        "claude", "-p",
+                        "--model", "opus",
+                        "--output-format", "stream-json",
+                        "--verbose",
+                        "--dangerously-skip-permissions",
+                        "--system-prompt", RALPH_SYSTEM_PROMPT,
+                        "--allowedTools", "Bash Read Write Edit Glob Grep WebFetch WebSearch",
+                        "--", prompt,
+                        cwd=self.project_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.STDOUT,
+                        env=self._env({"BD_ACTOR": "ralph"}),
+                    )
+
+                    # Stream stdout
+                    await self._stream_process_output()
+
+                    # Wait for exit
+                    await self.process.wait()
+                    exit_code = self.process.returncode
+                    logger.info("Project %s: Claude exited with code %d", self.project_name, exit_code)
+
+                    if exit_code != 0:
+                        await self._recover(self.current_issue_id)
+                        continue
+
+                    # --- Push ---
+                    push_proc = await asyncio.create_subprocess_exec(
+                        "git", "push",
+                        cwd=self.project_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    push_stdout, push_stderr = await push_proc.communicate()
+                    if push_proc.returncode == 0:
+                        logger.info("Pushed changes to GitHub for issue %s", self.current_issue_id)
+                    else:
                         logger.warning(
-                            "Issue %s was not closed by Ralph after iteration %d",
-                            self.current_issue_id, self.iteration,
+                            "git push failed for issue %s (exit %d): %s",
+                            self.current_issue_id,
+                            push_proc.returncode,
+                            push_stderr.decode(errors="replace").strip(),
                         )
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    pass
+
+                    # --- Check if issue was closed ---
+                    check_proc = await asyncio.create_subprocess_exec(
+                        "bd", "show", self.current_issue_id, "--json",
+                        cwd=self.project_dir,
+                        stdout=asyncio.subprocess.PIPE,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    check_out, _ = await check_proc.communicate()
+                    try:
+                        issue_data = json.loads(check_out.decode())
+                        # bd show --json may return a list or a dict
+                        if isinstance(issue_data, list):
+                            issue_data = issue_data[0] if issue_data else {}
+                        if issue_data.get("status") != "closed":
+                            logger.warning(
+                                "Issue %s was not closed by Ralph after iteration %d",
+                                self.current_issue_id, self.iteration,
+                            )
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        pass
+
+                except Exception:
+                    logger.exception(
+                        "Iteration %d crashed on issue %s in project %s",
+                        self.iteration, self.current_issue_id, self.project_name,
+                    )
+                    await self._recover(self.current_issue_id)
+                    continue
 
         except Exception:
             logger.exception("Ralph loop crashed for project %s", self.project_name)
         finally:
-            if self.status != "stopped":
-                self.status = "stopped"
-                await self._update_db_status("idle")
+            self.status = "stopped"
+            self._save_state()
+            await self._update_db_status("idle")
 
     async def _deploy_if_configured(self) -> None:
         """Deploy the project if deploy_type is configured in the DB."""
@@ -353,27 +400,42 @@ class RalphLoop:
 
     async def _recover(self, issue_id: str) -> None:
         """Reset git state, reopen issue, log crash, and publish event."""
-        logger.warning("Recovering from crash on issue %s", issue_id)
+        logger.warning(
+            "Recovering from crash on issue %s in project %s",
+            issue_id, self.project_name,
+        )
+
+        recovery_msg = f"Crashed on issue {issue_id}, recovering..."
+        await sse_bus.publish(
+            self.project_name, "ralph_stdout", {"line": recovery_msg},
+        )
 
         # git reset --hard HEAD
-        await asyncio.create_subprocess_exec(
+        reset_proc = await asyncio.create_subprocess_exec(
             "git", "reset", "--hard", "HEAD",
             cwd=self.project_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        await reset_proc.communicate()
 
         # Reopen issue
-        await asyncio.create_subprocess_exec(
+        reopen_proc = await asyncio.create_subprocess_exec(
             "bd", "update", issue_id, "--status", "open",
             cwd=self.project_dir,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
+        await reopen_proc.communicate()
 
         await sse_bus.publish(
             self.project_name, "ralph_status",
             {"status": "crash_recovery", "issue_id": issue_id},
+        )
+
+        logger.info(
+            "Recovery complete for issue %s in project %s",
+            issue_id, self.project_name,
         )
 
     async def stop(self) -> None:
