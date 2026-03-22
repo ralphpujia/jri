@@ -1525,7 +1525,15 @@
         // Hide jriBtnArea — stop/resume now lives in tab bar
         jriBtnArea.style.display = 'none';
 
-        // Manage ralph-controls in tab bar — always visible, enable/disable
+        // JRI button is for starting (first run), Resume is for resuming after stop
+        var jriBtnActive = false;
+        var jriMsg = document.querySelector('.jri-msg');
+        if (jriMsg) {
+            var jb = jriMsg.querySelector('.btn-jri');
+            jriBtnActive = jb && !jb.disabled;
+        }
+
+        // Manage ralph-controls in tab bar
         if (status === 'running') {
             btnRalphStop.disabled = false;
             btnRalphResume.disabled = true;
@@ -1536,12 +1544,9 @@
             btnRalphStop.disabled = true;
             btnRalphResume.disabled = false;
         } else {
-            // idle — enable resume if there are any issues to work on
+            // idle — Resume only if Ralph has been run before (not when JRI is available)
             btnRalphStop.disabled = true;
-            btnRalphResume.disabled = !(issuesData && (
-                (issuesData.epics && issuesData.epics.length > 0) ||
-                (issuesData.ungrouped && issuesData.ungrouped.length > 0)
-            ));
+            btnRalphResume.disabled = jriBtnActive;
         }
     }
 
