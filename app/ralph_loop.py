@@ -248,6 +248,7 @@ class RalphLoop:
                         stderr=asyncio.subprocess.PIPE,
                         env=self._env({"BD_ACTOR": "ralph"}),
                     )
+                    await sse_bus.publish(self.project_name, "issue_update", {"issue_id": self.current_issue_id, "action": "claimed"})
 
                     # --- Clear stdout for new issue ---
                     self.stdout_lines.clear()
@@ -326,6 +327,9 @@ class RalphLoop:
                             )
                     except (json.JSONDecodeError, UnicodeDecodeError):
                         pass
+
+                    # Notify frontend of issue state change
+                    await sse_bus.publish(self.project_name, "issue_update", {"issue_id": self.current_issue_id, "action": "completed"})
 
                 except Exception:
                     logger.exception(
