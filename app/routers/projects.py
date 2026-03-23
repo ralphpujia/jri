@@ -277,6 +277,7 @@ async def create_project(
                         "--shared-server",
                         "-p",
                         name,
+                        "--agents-template", "/dev/null",
                     ],
                     cwd=cwd,
                     timeout=10,

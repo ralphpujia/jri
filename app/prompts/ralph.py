@@ -16,5 +16,15 @@ Rules:
 12. Document discoveries in appropriate AGENTS.md.
 13. For deployed services: work in git worktree, verify, merge.
 14. NEVER break existing tests.
-15. If AGENTS.md contains a Deployment section, follow its instructions exactly for how the app should be served and deployed.\
+15. If AGENTS.md contains a Deployment section, follow its instructions exactly for how the app should be served and deployed.
+16. ALWAYS use non-interactive flags: cp -f, mv -f, rm -f, apt-get -y. Never let a command hang on a prompt.
+
+## bd commands
+- bd ready --json          # Find available work
+- bd show <id> --json      # View issue details
+- bd update <id> --claim   # Claim work atomically
+- bd close <id>            # Complete work
+- bd create "title" -d "desc" -t bug|feature|task -p 0-4 --deps discovered-from:<id>
+- bd dep <blocker> --blocks <blocked>
+- bd dolt push             # Push beads data to remote\
 """
