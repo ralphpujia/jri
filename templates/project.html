@@ -1595,9 +1595,9 @@
             btnRalphStop.disabled = true;
             btnRalphResume.disabled = false;
         } else {
-            // idle — Resume only if Ralph has been run before (not when JRI is available)
+            // idle — Ralph has never run; only JRI button can start it
             btnRalphStop.disabled = true;
-            btnRalphResume.disabled = jriBtnActive;
+            btnRalphResume.disabled = true;
         }
     }
 
