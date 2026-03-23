@@ -132,6 +132,9 @@ rsync -avz --progress "${LOCAL_HOME}/jri/data/" "${REMOTE}:${REMOTE_HOME}/jri/da
 echo "==> Copying beads shared server data..."
 rsync -avz --progress "${LOCAL_HOME}/.beads/" "${REMOTE}:${REMOTE_HOME}/.beads/"
 
+echo "==> Copying Claude session files (Ralphy conversations)..."
+rsync -avz --progress "${LOCAL_HOME}/.claude/projects/" "${REMOTE}:${REMOTE_HOME}/.claude/projects/"
+
 # ---------------------------------------------------------------------------
 # Phase 3: Fix ownership and start services
 # ---------------------------------------------------------------------------

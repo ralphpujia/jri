@@ -49,6 +49,18 @@ make run
 # App starts at http://127.0.0.1:8000
 ```
 
+## Data
+
+| What | Where |
+|------|-------|
+| App database (users, projects) | `~/jri/data/jri.db` (SQLite) |
+| Project repos + uploads | `~/jri/data/<github-username>/<project-name>/` |
+| Beads issues (per project) | `~/jri/data/<user>/<project>/.beads/` |
+| Shared Dolt server | `~/.beads/shared-server/` |
+| Ralphy session files | `~/.claude/projects/-home-nico-jri-data-<user>-<project>/` |
+| Auth credentials | `~/jri/.env`, `~/.config/gh/hosts.yml`, `~/.claude/.credentials.json` |
+| Waitlist (maintenance mode) | `~/jri/data/waitlist.txt` |
+
 ## Logs
 
 | What | Where |
