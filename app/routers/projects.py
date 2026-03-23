@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from app.auth_utils import get_current_user
-from app.config import DATA_DIR, RALPH_BOT_GITHUB_TOKEN
+from app.config import DATA_DIR, RALPH_BOT_GITHUB_TOKEN, MAINTENANCE_MODE
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
@@ -202,6 +202,19 @@ async def create_project(
     user: dict = Depends(get_current_user),
 ):
     name = body.name
+    # Maintenance mode: save interested user's email and reject
+    if MAINTENANCE_MODE:
+        email = user.get("github_email") or f"{user['github_username']}@users.noreply.github.com"
+        waitlist_path = DATA_DIR / "waitlist.txt"
+        # Append if not already in the list
+        existing = waitlist_path.read_text() if waitlist_path.exists() else ""
+        if email not in existing:
+            with open(waitlist_path, "a") as f:
+                f.write(f"{email}\n")
+        raise HTTPException(
+            status_code=503,
+            detail="We're currently in maintenance. We've saved your email and will notify you when we're back!",
+        )
     description = body.description
 
     # --- Token check ---

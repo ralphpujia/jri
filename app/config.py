@@ -41,6 +41,8 @@ def _get_ralph_bot_github_token() -> str:
 
 RALPH_BOT_GITHUB_TOKEN: str = _get_ralph_bot_github_token()
 
+MAINTENANCE_MODE = os.getenv("MAINTENANCE_MODE", "").lower() in ("1", "true", "yes")
+
 # ── Startup validation ──
 _REQUIRED = {
     "GITHUB_CLIENT_ID": GITHUB_CLIENT_ID,
