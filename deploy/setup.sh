@@ -34,7 +34,7 @@ fi
 echo "==> Installing system packages..."
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y python3 python3-pip python3-venv nginx git curl jq rsync sqlite3
+apt-get install -y python3 python3-pip python3-venv nginx git curl jq rsync sqlite3 mosh
 
 # --- Node.js 22 via nodesource ---
 echo "==> Installing Node.js 22..."
