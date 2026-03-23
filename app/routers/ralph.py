@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-
 import stripe
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -12,6 +11,7 @@ from app.auth_utils import get_current_user
 from app.config import BASE_URL, DATA_DIR, STRIPE_SECRET_KEY
 from app.database import get_db
 from app.ralph_loop import RalphLoop
+from app.routers.projects import _get_issue_count, _get_project_dir
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +65,20 @@ async def _start_ralph_loop(name: str, project: dict, user: dict) -> None:
 
 @router.post("/{name}/ralph/checkout")
 async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
-    """Create a Stripe checkout session or grant free tier access."""
+    """Create a Stripe checkout session or start Ralph if already paid."""
     project = await _get_project(name, user)
+    project_dir = await _get_project_dir(name, user)
+
+    # Already paid — just start Ralph
+    if project.get("stripe_payment_id"):
+        await _start_ralph_loop(name, project, user)
+        return {"free": True, "redirect": None}
+
+    issue_count = await _get_issue_count(project_dir)
+    if issue_count == 0:
+        raise HTTPException(status_code=400, detail="No issues found — nothing to bid on")
+
+    unit_amount = issue_count * 100  # $1 per issue in cents
 
     # Create Stripe Checkout Session
     checkout_session = stripe.checkout.Session.create(
@@ -75,9 +87,9 @@ async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
             {
                 "price_data": {
                     "currency": "usd",
-                    "unit_amount": 2000,
+                    "unit_amount": unit_amount,
                     "product_data": {
-                        "name": f"Just Ralph It — {name}",
+                        "name": f"Just Ralph It — {name} ({issue_count} issues)",
                     },
                 },
                 "quantity": 1,

@@ -933,6 +933,7 @@
     var PROJECT_DESCRIPTION = {{ project.description | tojson }};
     var PROJECT_HAS_SESSION = {{ (project.ralph_session_id or '') | tojson }} !== '';
     var PROJECT_RALPH_STATUS = {{ (project.ralph_loop_status or 'idle') | tojson }};
+    var PROJECT_HAS_PAYMENT = {{ (project.stripe_payment_id or '') | tojson }} !== '';
     var STORAGE_KEY = 'jri-chat-' + PROJECT_NAME;
     var API = '/api/projects/' + encodeURIComponent(PROJECT_NAME);
     var ralphyProcessing = false;
@@ -1630,9 +1631,9 @@
             btnRalphStop.disabled = true;
             btnRalphResume.disabled = false;
         } else {
-            // idle — Ralph has never run; only JRI button can start it
+            // idle — enable Resume if already paid, otherwise only JRI can start
             btnRalphStop.disabled = true;
-            btnRalphResume.disabled = true;
+            btnRalphResume.disabled = !PROJECT_HAS_PAYMENT;
         }
     }
 
