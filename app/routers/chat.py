@@ -161,7 +161,17 @@ async def _stream_claude(
                 env={**os.environ, **env},
             )
 
-            async for raw_line in proc.stdout:
+            while True:
+                try:
+                    raw_line = await asyncio.wait_for(proc.stdout.readline(), timeout=15)
+                except (asyncio.TimeoutError, TimeoutError):
+                    # Keep connection alive during long tool executions
+                    yield ": keepalive\n\n"
+                    continue
+
+                if not raw_line:
+                    break  # EOF
+
                 line = raw_line.decode().strip()
                 if not line:
                     continue
