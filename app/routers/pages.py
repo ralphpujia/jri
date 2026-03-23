@@ -86,7 +86,7 @@ async def project_page(request: Request, name: str):
     async with get_db() as db:
         cursor = await db.execute(
             "SELECT id, name, description, github_repo_url, ralph_loop_status, "
-            "ralph_loop_current_issue, ralph_loop_iteration, ralph_session_id "
+            "ralph_loop_current_issue, ralph_loop_iteration, ralph_session_id, stripe_payment_id "
             "FROM projects WHERE user_id = ? AND name = ?",
             (user_id, name),
         )
