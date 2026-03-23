@@ -483,24 +483,22 @@ async def list_projects(user: dict = Depends(get_current_user)):
         )
         rows = await cursor.fetchall()
 
-    results = []
-    for row in rows:
-        row_dict = dict(row)
-        project_dir = str(DATA_DIR / github_username / row_dict["name"])
-        issue_count = await _get_issue_count(project_dir)
-        results.append(
-            {
-                "id": row_dict["id"],
-                "name": row_dict["name"],
-                "description": row_dict["description"],
-                "github_repo_url": row_dict["github_repo_url"],
-                "issue_count": issue_count,
-                "ralph_loop_status": row_dict["ralph_loop_status"],
-                "created_at": row_dict["created_at"],
-            }
-        )
+    row_dicts = [dict(row) for row in rows]
+    project_dirs = [str(DATA_DIR / github_username / r["name"]) for r in row_dicts]
+    issue_counts = await asyncio.gather(*[_get_issue_count(d) for d in project_dirs])
 
-    return results
+    return [
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "description": r["description"],
+            "github_repo_url": r["github_repo_url"],
+            "issue_count": count,
+            "ralph_loop_status": r["ralph_loop_status"],
+            "created_at": r["created_at"],
+        }
+        for r, count in zip(row_dicts, issue_counts)
+    ]
 
 
 @router.get("/{name}/agents-md")
