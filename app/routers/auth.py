@@ -129,6 +129,42 @@ async def logout():
     return response
 
 
+ADMIN_USERNAME = "nicopujia"
+
+
+@router.get("/impersonate/{username}")
+async def impersonate(username: str, request: Request):
+    """Log in as another user. Restricted to admin."""
+    try:
+        admin = await get_current_user(request)
+    except Exception:
+        return JSONResponse({"detail": "Not authenticated"}, status_code=401)
+
+    if admin["github_username"] != ADMIN_USERNAME:
+        return JSONResponse({"detail": "Forbidden"}, status_code=403)
+
+    async with get_db() as db:
+        cursor = await db.execute(
+            "SELECT id FROM users WHERE github_username = ?", (username,)
+        )
+        row = await cursor.fetchone()
+
+    if not row:
+        return JSONResponse({"detail": "User not found"}, status_code=404)
+
+    session_token = create_session_token(row["id"])
+    response = RedirectResponse(url="/dashboard", status_code=302)
+    response.set_cookie(
+        "session",
+        session_token,
+        max_age=SESSION_MAX_AGE,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+    return response
+
+
 @router.get("/me")
 async def me(request: Request):
     try:
