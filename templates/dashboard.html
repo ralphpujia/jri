@@ -156,7 +156,7 @@
 
 {% block content %}
 <nav>
-    <a href="/dashboard" class="brand">Just Ralph It</a>
+    <a href="/projects" class="brand">Just Ralph It</a>
     <div class="nav-right">
         <img src="{{ user.github_avatar_url }}" alt="Avatar">
         <span class="username">{{ user.github_username }}</span>
@@ -199,7 +199,7 @@
 
             var nameLink = document.createElement('a');
             nameLink.className = 'project-name';
-            nameLink.href = '/project/' + encodeURIComponent(p.name);
+            nameLink.href = '/projects/' + encodeURIComponent(p.name);
             nameLink.textContent = p.name;
             info.appendChild(nameLink);
 
@@ -246,7 +246,7 @@
                 // Don't navigate if clicking the delete button
                 if (e.target.closest('.btn-delete')) return;
                 if (e.target.closest('.gh-link')) return;
-                window.location.href = '/project/' + encodeURIComponent(p.name);
+                window.location.href = '/projects/' + encodeURIComponent(p.name);
             });
             listEl.appendChild(card);
         });

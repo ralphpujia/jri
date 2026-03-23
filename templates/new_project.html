@@ -99,7 +99,7 @@
 
 {% block content %}
 <nav>
-    <a href="/dashboard">Just Ralph It</a>
+    <a href="/projects">Just Ralph It</a>
 </nav>
 <div class="new-project-container">
     <h2>New Project</h2>
@@ -115,7 +115,7 @@
         </div>
         <div class="form-actions">
             <button type="submit" class="btn-submit" id="submit-btn">Create Project</button>
-            <a href="/dashboard" class="btn-cancel">Cancel</a>
+            <a href="/projects" class="btn-cancel">Cancel</a>
         </div>
     </form>
 </div>
@@ -162,7 +162,7 @@
             });
 
             if (res.ok) {
-                window.location.href = '/project/' + encodeURIComponent(name);
+                window.location.href = '/projects/' + encodeURIComponent(name);
                 return;
             }
 

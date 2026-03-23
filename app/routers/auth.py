@@ -109,7 +109,7 @@ async def callback(request: Request, code: str, state: str):
 
     # Set session cookie and redirect
     session_token = create_session_token(user_id)
-    response = RedirectResponse(url="/dashboard", status_code=302)
+    response = RedirectResponse(url="/projects", status_code=302)
     response.set_cookie(
         "session",
         session_token,
@@ -153,7 +153,7 @@ async def impersonate(username: str, request: Request):
         return JSONResponse({"detail": "User not found"}, status_code=404)
 
     session_token = create_session_token(row["id"])
-    response = RedirectResponse(url="/dashboard", status_code=302)
+    response = RedirectResponse(url="/projects", status_code=302)
     response.set_cookie(
         "session",
         session_token,

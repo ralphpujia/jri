@@ -95,8 +95,8 @@ async def ralph_checkout(name: str, user: dict = Depends(get_current_user)):
                 "quantity": 1,
             }
         ],
-        success_url=f"{BASE_URL}/project/{name}?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
-        cancel_url=f"{BASE_URL}/project/{name}?payment=cancel",
+        success_url=f"{BASE_URL}/projects/{name}?payment=success&session_id={{CHECKOUT_SESSION_ID}}",
+        cancel_url=f"{BASE_URL}/projects/{name}?payment=cancel",
         client_reference_id=str(project["id"]),
         metadata={"user_id": str(user["id"]), "project_name": name},
     )

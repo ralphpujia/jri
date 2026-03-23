@@ -35,12 +35,11 @@ async def _is_logged_in(request: Request) -> bool:
 
 @router.get("/")
 async def landing(request: Request):
-    if await _is_logged_in(request):
-        return RedirectResponse(url="/dashboard", status_code=302)
-    return templates.TemplateResponse("landing.html", {"request": request})
+    logged_in = await _is_logged_in(request)
+    return templates.TemplateResponse("landing.html", {"request": request, "logged_in": logged_in})
 
 
-@router.get("/dashboard")
+@router.get("/projects")
 async def dashboard(request: Request):
     token = request.cookies.get("session")
     if not token:
@@ -58,6 +57,17 @@ async def dashboard(request: Request):
     return templates.TemplateResponse("dashboard.html", {"request": request, "user": user})
 
 
+# Legacy redirects
+@router.get("/dashboard")
+async def dashboard_redirect():
+    return RedirectResponse(url="/projects", status_code=301)
+
+
+@router.get("/project/{name}")
+async def project_redirect(name: str):
+    return RedirectResponse(url=f"/projects/{name}", status_code=301)
+
+
 @router.get("/new")
 async def new_project(request: Request):
     if not await _is_logged_in(request):
@@ -65,7 +75,7 @@ async def new_project(request: Request):
     return templates.TemplateResponse("new_project.html", {"request": request})
 
 
-@router.get("/project/{name}")
+@router.get("/projects/{name}")
 async def project_page(request: Request, name: str):
     token = request.cookies.get("session")
     if not token:

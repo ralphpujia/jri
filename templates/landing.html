@@ -46,12 +46,6 @@ body.landing {
     overflow: hidden;
     background-color: var(--landing-bg);
 }
-.landing-grid-bg {
-    background-image:
-        linear-gradient(rgba(255, 215, 0, 0.04) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 215, 0, 0.04) 1px, transparent 1px);
-    background-size: 20px 20px;
-}
 .landing-scanline::after {
     content: '';
     position: fixed;
@@ -77,7 +71,6 @@ body.landing {
 .landing-card {
     position: relative;
     z-index: 10;
-    border: 2px solid var(--landing-accent);
     background-color: var(--landing-card-bg);
     padding: 2.5rem;
     display: flex;
@@ -131,7 +124,6 @@ body.landing {
 .landing-tagline {
     color: var(--landing-text-muted);
     font-size: 0.75rem;
-    text-transform: uppercase;
     letter-spacing: 0.1em;
     margin: 0;
     font-family: var(--landing-font);
@@ -185,7 +177,7 @@ body.landing {
 {% endblock %}
 
 {% block content %}
-<div id="bouncing-logo-container" class="landing-fullscreen landing-grid-bg landing-scanline">
+<div id="bouncing-logo-container" class="landing-fullscreen landing-scanline">
     <!-- Bouncing Logo -->
     <img id="bouncing-logo"
          src="/static/img/ralph-logo.png"
@@ -205,13 +197,17 @@ body.landing {
                 <span class="bracket-corner bracket-br" aria-hidden="true"></span>
                 <h1 class="landing-title glitch-text terminal-glow">JUSTRALPH.IT</h1>
             </div>
-            <p class="landing-subtitle">FROM IDEA TO CODE</p>
-            <p class="landing-tagline">DESCRIBE YOUR PROJECT.<br>RALPH BUILDS IT.</p>
+            <p class="landing-subtitle">Build software with AI</p>
+            <p class="landing-tagline">Spend 12h speccing your project; ship it by the morning fully as expected.</p>
         </div>
 
         <!-- Actions -->
         <div class="landing-actions">
+            {% if logged_in %}
+            <a href="/projects" class="btn-login">GO TO DASHBOARD</a>
+            {% else %}
             <a href="/auth/login" class="btn-login">LOGIN WITH GITHUB</a>
+            {% endif %}
         </div>
     </div>
 </div>
