@@ -2324,17 +2324,22 @@
 
         if (history.length > 0) {
             renderHistory(history);
-        } else if (PROJECT_HAS_SESSION) {
-            // localStorage empty but session exists — recover from server
+        }
+
+        if (PROJECT_HAS_SESSION) {
+            // Always sync with server — localStorage may be stale or empty
             fetch(API + '/chat/history')
                 .then(function(r) { return r.json(); })
                 .then(function(data) {
-                    if (data.messages && data.messages.length > 0) {
+                    if (!data.messages || data.messages.length === 0) return;
+                    // Check if localStorage matches server
+                    var serverCount = data.messages.length;
+                    var localCount = history.length;
+                    if (serverCount !== localCount) {
+                        // Server is source of truth — re-render
+                        chatMessages.querySelectorAll('.chat-msg').forEach(function(el) { el.remove(); });
                         renderHistory(data.messages);
-                        // Save to localStorage so next reload is instant
-                        data.messages.forEach(function(m) {
-                            appendToHistory(m.role, m.content);
-                        });
+                        saveChatHistory(data.messages);
                     }
                 })
                 .catch(function() {});
