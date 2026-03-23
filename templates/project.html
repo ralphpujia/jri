@@ -2292,31 +2292,53 @@
             localStorage.removeItem(STORAGE_KEY + '-jri');
         }
 
-        // 1. Restore chat history from localStorage
+        // 1. Restore chat history from localStorage, or fetch from server if empty
         var history = loadChatHistory();
-        history.forEach(function(msg) {
-            var html = '';
-            if (msg.thinkingText || (msg.thinkingSteps && msg.thinkingSteps.length > 0)) {
-                html += '<div class="thinking-content">';
-                html += '<details class="thinking"><summary>Thinking...</summary>';
-                if (msg.thinkingText) {
-                    html += '<div>' + escapeHtml(msg.thinkingText) + '</div>';
+
+        function renderHistory(msgs) {
+            msgs.forEach(function(msg) {
+                var html = '';
+                if (msg.thinkingText || (msg.thinkingSteps && msg.thinkingSteps.length > 0)) {
+                    html += '<div class="thinking-content">';
+                    html += '<details class="thinking"><summary>Thinking...</summary>';
+                    if (msg.thinkingText) {
+                        html += '<div>' + escapeHtml(msg.thinkingText) + '</div>';
+                    }
+                    if (msg.thinkingSteps && msg.thinkingSteps.length > 0) {
+                        msg.thinkingSteps.forEach(function(s) {
+                            html += '<div>Tool: ' + escapeHtml(s) + '</div>';
+                        });
+                    }
+                    if (msg.interleaveText) {
+                        html += '<div class="thinking-interleave">' + escapeHtml(msg.interleaveText) + '</div>';
+                    }
+                    html += '</div></details>';
                 }
-                if (msg.thinkingSteps && msg.thinkingSteps.length > 0) {
-                    msg.thinkingSteps.forEach(function(s) {
-                        html += '<div>Tool: ' + escapeHtml(s) + '</div>';
-                    });
+                if (msg.content) {
+                    html += '<div class="message-text">' + renderMarkdown(msg.content) + '</div>';
                 }
-                if (msg.interleaveText) {
-                    html += '<div class="thinking-interleave">' + escapeHtml(msg.interleaveText) + '</div>';
-                }
-                html += '</div></details>';
-            }
-            if (msg.content) {
-                html += '<div class="message-text">' + renderMarkdown(msg.content) + '</div>';
-            }
-            addChatMessage(msg.role, html);
-        });
+                addChatMessage(msg.role, html);
+            });
+            scrollChat();
+        }
+
+        if (history.length > 0) {
+            renderHistory(history);
+        } else if (PROJECT_HAS_SESSION) {
+            // localStorage empty but session exists — recover from server
+            fetch(API + '/chat/history')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.messages && data.messages.length > 0) {
+                        renderHistory(data.messages);
+                        // Save to localStorage so next reload is instant
+                        data.messages.forEach(function(m) {
+                            appendToHistory(m.role, m.content);
+                        });
+                    }
+                })
+                .catch(function() {});
+        }
 
         // 1b. Restore pending message from interrupted stream
         var pendingRaw = localStorage.getItem(STORAGE_KEY + '-pending');

@@ -283,3 +283,62 @@ async def chat(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+def _extract_text_content(content) -> str:
+    """Extract text from a message content field (string or list of blocks)."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                parts.append(block.get("text", ""))
+        return "".join(parts)
+    return ""
+
+
+@router.get("/{name}/chat/history")
+async def get_chat_history(name: str, user: dict = Depends(get_current_user)):
+    project = await _get_project_for_user(user, name)
+    session_id = project.get("ralph_session_id")
+
+    if not session_id:
+        return {"messages": []}
+
+    github_username: str = user["github_username"]
+    session_file = (
+        Path.home()
+        / ".claude"
+        / "projects"
+        / f"-home-nico-jri-data-{github_username}-{name}"
+        / f"{session_id}.jsonl"
+    )
+
+    if not session_file.exists():
+        return {"messages": []}
+
+    messages = []
+    for line in session_file.read_text().splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            msg = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        role = None
+        if msg.get("type") == "user" and msg.get("message", {}).get("role") == "user":
+            role = "user"
+            content = _extract_text_content(msg.get("message", {}).get("content", ""))
+        elif msg.get("type") == "assistant" and msg.get("message", {}).get("role") == "assistant":
+            role = "assistant"
+            content = _extract_text_content(msg.get("message", {}).get("content", ""))
+        else:
+            continue
+
+        if content:
+            messages.append({"role": role, "content": content})
+
+    return {"messages": messages}
