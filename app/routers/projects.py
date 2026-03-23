@@ -355,7 +355,7 @@ async def create_project(
                     headers=headers,
                     json={
                         "name": f"{github_username}-{name}",
-                        "description": description,
+                        "description": description[:350] if description else "",
                         "private": True,
                         "auto_init": False,
                     },
