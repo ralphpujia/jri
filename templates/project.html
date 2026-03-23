@@ -2031,9 +2031,15 @@
         var promises = uploads.map(function(file) {
             var fd = new FormData();
             fd.append('file', file);
-            return fetch(API + '/uploads', { method: 'POST', body: fd });
+            return fetch(API + '/uploads', { method: 'POST', body: fd })
+                .then(function(r) {
+                    if (!r.ok) throw new Error(r.status === 413 ? 'File too large (max 10MB)' : 'Upload failed');
+                    return r;
+                });
         });
-        Promise.all(promises).then(function() { fetchUploads(); });
+        Promise.all(promises)
+            .then(function() { fetchUploads(); })
+            .catch(function(err) { alert(err.message); });
     }
 
     btnUploadFile.addEventListener('click', function() { uploadFileInput.click(); });
