@@ -110,6 +110,10 @@ class RalphLoop:
                         stderr=asyncio.subprocess.PIPE,
                     )
                     await reopen_proc.communicate()
+                    await sse_bus.publish(
+                        project_name, "issue_update",
+                        {"issue_id": issue_id, "action": "reopened"},
+                    )
                 # Clean up state file
                 state_path.unlink(missing_ok=True)
         except Exception:
@@ -436,6 +440,10 @@ class RalphLoop:
         await sse_bus.publish(
             self.project_name, "ralph_status",
             {"status": "crash_recovery", "issue_id": issue_id},
+        )
+        await sse_bus.publish(
+            self.project_name, "issue_update",
+            {"issue_id": issue_id, "action": "reopened"},
         )
 
         logger.info(

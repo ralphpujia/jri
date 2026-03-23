@@ -97,7 +97,7 @@
     /* ── Main layout ── */
     .main-layout {
         display: grid;
-        grid-template-columns: 40% 1px 1fr;
+        grid-template-columns: 40% 5px 1fr;
         height: calc(100vh - 48px);
         overflow: hidden;
     }
@@ -106,6 +106,12 @@
     }
     .divider {
         background: var(--border-light);
+        cursor: col-resize;
+        width: 5px;
+        transition: background 0.15s;
+    }
+    .divider:hover, .divider.dragging {
+        background: var(--border-focus);
     }
 
     /* ── Left panel: Chat ── */
@@ -458,7 +464,7 @@
         opacity: 0;
         pointer-events: none;
         transition: opacity 120ms ease;
-        z-index: 10;
+        z-index: 9999;
     }
     .status-dot-wrap:hover::after,
     .status-dot-wrap:focus-visible::after {
@@ -926,6 +932,7 @@
     var PROJECT_NAME = {{ project.name | tojson }};
     var PROJECT_DESCRIPTION = {{ project.description | tojson }};
     var PROJECT_HAS_SESSION = {{ (project.ralph_session_id or '') | tojson }} !== '';
+    var PROJECT_RALPH_STATUS = {{ (project.ralph_loop_status or 'idle') | tojson }};
     var STORAGE_KEY = 'jri-chat-' + PROJECT_NAME;
     var API = '/api/projects/' + encodeURIComponent(PROJECT_NAME);
     var ralphyProcessing = false;
@@ -1054,19 +1061,49 @@
         s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
         s = s.replace(/^# (.+)$/gm, '<h1>$1</h1>');
 
-        // Normalize blank lines between consecutive list items
-        s = s.replace(/^([*-] .+)\n{2,}(?=[*-] )/gm, '$1\n');
-        s = s.replace(/^(\d+\. .+)\n{2,}(?=\d+\. )/gm, '$1\n');
+        // Lists: handle nesting by processing line-by-line
+        var listLines = s.split('\n');
+        var listResult = [];
+        var listStack = []; // stack of {type: 'ul'|'ol', indent: number}
 
-        // Unordered lists
-        s = s.replace(/^[*-] (.+)$/gm, '<uli>$1</uli>');
-        s = s.replace(/((?:<uli>.*<\/uli>\n?)+)/g, '<ul>$1</ul>');
-        s = s.replace(/<\/?uli>/g, function(m) { return m.replace('uli', 'li'); });
+        function closeListsTo(indent) {
+            while (listStack.length > 0 && listStack[listStack.length - 1].indent >= indent) {
+                listResult.push('</' + listStack.pop().type + '>');
+            }
+        }
 
-        // Ordered lists
-        s = s.replace(/^\d+\. (.+)$/gm, '<oli>$1</oli>');
-        s = s.replace(/((?:<oli>.*<\/oli>\n?)+)/g, '<ol>$1</ol>');
-        s = s.replace(/<\/?oli>/g, function(m) { return m.replace('oli', 'li'); });
+        for (var li = 0; li < listLines.length; li++) {
+            var rawLine = listLines[li];
+            var ulMatch = rawLine.match(/^(\s*)[*-]\s+(.+)$/);
+            var olMatch = rawLine.match(/^(\s*)\d+\.\s+(.+)$/);
+
+            if (ulMatch || olMatch) {
+                var indent = (ulMatch || olMatch)[1].length;
+                var text = (ulMatch || olMatch)[2];
+                var type = ulMatch ? 'ul' : 'ol';
+
+                if (listStack.length === 0 || indent > listStack[listStack.length - 1].indent) {
+                    listStack.push({type: type, indent: indent});
+                    listResult.push('<' + type + '>');
+                } else if (indent < listStack[listStack.length - 1].indent) {
+                    closeListsTo(indent);
+                    if (listStack.length === 0 || listStack[listStack.length - 1].indent < indent) {
+                        listStack.push({type: type, indent: indent});
+                        listResult.push('<' + type + '>');
+                    }
+                } else if (listStack[listStack.length - 1].type !== type) {
+                    listResult.push('</' + listStack.pop().type + '>');
+                    listStack.push({type: type, indent: indent});
+                    listResult.push('<' + type + '>');
+                }
+                listResult.push('<li>' + text + '</li>');
+            } else {
+                closeListsTo(0);
+                listResult.push(rawLine);
+            }
+        }
+        closeListsTo(0);
+        s = listResult.join('\n');
 
         // Tables
         s = s.replace(/^(\|.+\|)\n\|[\s:|-]+\|\n((?:\|.+\|\n?)*)/gm, function(match, headerRow, bodyRows) {
@@ -1493,11 +1530,11 @@
         var jriBtn = document.createElement('button');
         jriBtn.className = 'btn-jri';
 
-        var isActive = projectData && (projectData.ralph_loop_status === 'running' || projectData.ralph_loop_status === 'stopping');
+        var isActive = (projectData && (projectData.ralph_loop_status === 'running' || projectData.ralph_loop_status === 'stopping'))
+            || PROJECT_RALPH_STATUS === 'running' || PROJECT_RALPH_STATUS === 'stopping';
         if (isActive) {
             jriBtn.textContent = 'Ralph is building...';
             jriBtn.disabled = true;
-            jriBtn.style.opacity = '0.5';
             jriBtn.style.cursor = 'not-allowed';
             jriBtn.style.background = 'var(--border-light)';
             jriBtn.style.color = 'var(--text-dim)';
@@ -1514,7 +1551,6 @@
                     if (data.free) {
                         localStorage.removeItem(STORAGE_KEY + '-jri');
                         jriBtn.textContent = 'Ralph is building...';
-                        jriBtn.style.opacity = '0.5';
                         jriBtn.style.cursor = 'not-allowed';
                         jriBtn.style.background = 'var(--border-light)';
                         jriBtn.style.color = 'var(--text-dim)';
@@ -1565,7 +1601,6 @@
                 if (jriBtn) {
                     jriBtn.textContent = 'Ralph is building...';
                     jriBtn.disabled = true;
-                    jriBtn.style.opacity = '0.5';
                     jriBtn.style.cursor = 'not-allowed';
                     jriBtn.style.background = 'var(--border-light)';
                     jriBtn.style.color = 'var(--text-dim)';
@@ -1708,6 +1743,48 @@
             return;
         }
 
+        function topoSort(issues) {
+            // Build dependency graph from 'blocks' type dependencies
+            var idSet = {};
+            issues.forEach(function(i) { idSet[i.id] = i; });
+            var inDegree = {};
+            var adj = {};
+            issues.forEach(function(i) {
+                inDegree[i.id] = 0;
+                adj[i.id] = [];
+            });
+            issues.forEach(function(i) {
+                (i.dependencies || []).forEach(function(d) {
+                    // If this issue depends on another in this list
+                    var depId = d.depends_on_id || d.depends_on;
+                    if (depId && idSet[depId] && d.type !== 'parent-child') {
+                        adj[depId] = adj[depId] || [];
+                        adj[depId].push(i.id);
+                        inDegree[i.id] = (inDegree[i.id] || 0) + 1;
+                    }
+                });
+            });
+            // Kahn's algorithm
+            var queue = [];
+            issues.forEach(function(i) {
+                if (!inDegree[i.id]) queue.push(i.id);
+            });
+            var sorted = [];
+            while (queue.length > 0) {
+                var id = queue.shift();
+                sorted.push(idSet[id]);
+                (adj[id] || []).forEach(function(nid) {
+                    inDegree[nid]--;
+                    if (inDegree[nid] === 0) queue.push(nid);
+                });
+            }
+            // Add any remaining (cycles) at the end
+            issues.forEach(function(i) {
+                if (sorted.indexOf(i) === -1) sorted.push(i);
+            });
+            return sorted;
+        }
+
         (data.epics || []).forEach(function(epic) {
             var section = document.createElement('div');
             section.className = 'epic-section';
@@ -1717,7 +1794,8 @@
             header.innerHTML = statusDotHtml(epic.status, 'epic') + ' ' + escapeHtml(epic.title || epic.id);
             section.appendChild(header);
 
-            (epic.children || []).forEach(function(issue) {
+            var sorted = topoSort(epic.children || []);
+            sorted.forEach(function(issue) {
                 section.appendChild(createIssueRow(issue));
             });
 
@@ -1728,7 +1806,8 @@
             var ungroupedSection = document.createElement('div');
             ungroupedSection.className = 'epic-section';
 
-            data.ungrouped.forEach(function(issue) {
+            var sorted = topoSort(data.ungrouped);
+            sorted.forEach(function(issue) {
                 ungroupedSection.appendChild(createIssueRow(issue));
             });
 
@@ -2283,6 +2362,41 @@
     }
 
     /* ══════════════════════════════════════════════
+       RESIZABLE PANELS
+       ══════════════════════════════════════════════ */
+    (function() {
+        var divider = document.querySelector('.divider');
+        var layout = document.querySelector('.main-layout');
+        if (!divider || !layout) return;
+
+        var dragging = false;
+
+        divider.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            dragging = true;
+            divider.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!dragging) return;
+            var rect = layout.getBoundingClientRect();
+            var pct = ((e.clientX - rect.left) / rect.width) * 100;
+            pct = Math.max(20, Math.min(80, pct));
+            layout.style.gridTemplateColumns = pct + '% 5px 1fr';
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (!dragging) return;
+            dragging = false;
+            divider.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+    })();
+
+    /* ══════════════════════════════════════════════
        INIT
        ══════════════════════════════════════════════ */
     function init() {
@@ -2390,6 +2504,18 @@
         if (window.location.search.indexOf('payment=success') !== -1) {
             activateTab('ralph');
             history.replaceState(null, '', '#ralph');
+            // Payment callback already started Ralph — update UI
+            var jriMsg = document.querySelector('.jri-msg');
+            if (jriMsg) {
+                var jriBtn = jriMsg.querySelector('.btn-jri');
+                if (jriBtn) {
+                    jriBtn.textContent = 'Ralph is building...';
+                    jriBtn.disabled = true;
+                    jriBtn.style.cursor = 'not-allowed';
+                    jriBtn.style.background = 'var(--border-light)';
+                    jriBtn.style.color = 'var(--text-dim)';
+                }
+            }
         } else if (initialHash && hashToTab[initialHash]) {
             activateTab(hashToTab[initialHash]);
         }

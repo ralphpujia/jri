@@ -197,6 +197,9 @@ async def _stream_claude(
                     if content_block.get("type") == "tool_use":
                         event = {"type": "tool_use", "name": content_block["name"], "input": content_block.get("input", {})}
                         yield f"data: {json.dumps(event)}\n\n"
+                        # Publish issue_update when Ralphy uses Bash (likely bd commands)
+                        if content_block["name"] == "Bash":
+                            await sse_bus.publish(project_name, "issue_update", {})
 
                 elif msg_type == "content_block_delta":
                     delta = data.get("delta", {})
@@ -240,6 +243,8 @@ async def _stream_claude(
     finally:
         _active_procs.pop(project_name, None)
         await sse_bus.publish(project_name, "ralphy_processing", {"status": "end"})
+        # Final issue refresh so all clients pick up any bd changes Ralphy made
+        await sse_bus.publish(project_name, "issue_update", {})
 
 
 @router.post("/{name}/chat")
@@ -361,4 +366,12 @@ async def get_chat_history(name: str, user: dict = Depends(get_current_user)):
         if content:
             messages.append({"role": role, "content": content})
 
-    return {"messages": messages}
+    # Merge consecutive assistant messages (tool-use fragments during thinking)
+    merged = []
+    for msg in messages:
+        if merged and merged[-1]["role"] == "assistant" and msg["role"] == "assistant":
+            merged[-1]["content"] += "\n\n" + msg["content"]
+        else:
+            merged.append(msg)
+
+    return {"messages": merged}

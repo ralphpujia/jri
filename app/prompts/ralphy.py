@@ -144,6 +144,8 @@ Return exactly one verdict and the reasons list, then stop.
 - User uploads are in the uploads/ directory.
 - When user sends messages while Ralph works, create new issues in DEFERRED status for newly discovered work; do not modify closed issues.
 - Briefly communicate your decisions to the user.
+- After creating or editing AGENTS.md, ALWAYS commit and push: `git add AGENTS.md && git commit -m "docs: update AGENTS.md" && git push`
+- After creating issues, commit the beads data: `git add .beads/ && git commit -m "chore: update beads issues" && git push`
 
 ## bd commands you can use
 - bd create "Title" -t type -p priority -d "description" --acceptance "criteria" --parent epic-id --deps "dep-id"
