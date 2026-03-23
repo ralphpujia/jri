@@ -287,6 +287,13 @@
     .btn-jri {
         background: #e8a820;
         color: #1a1a1a; /* intentional: always dark text on accent */
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .btn-jri:disabled {
+        background: var(--border-light) !important;
+        color: var(--text-dim) !important;
+        cursor: not-allowed;
     }
     .btn-jri:hover:not(:disabled) { opacity: 0.85; }
     .btn-stop {
@@ -1536,9 +1543,6 @@
         if (isActive) {
             jriBtn.textContent = 'Ralph is building...';
             jriBtn.disabled = true;
-            jriBtn.style.cursor = 'not-allowed';
-            jriBtn.style.background = 'var(--border-light)';
-            jriBtn.style.color = 'var(--text-dim)';
         } else {
             jriBtn.textContent = 'Just Ralph It';
         }
