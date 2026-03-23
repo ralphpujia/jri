@@ -1202,7 +1202,9 @@
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 200) + 'px';
         this.style.overflowY = this.scrollHeight > 200 ? 'auto' : 'hidden';
+        btnSend.disabled = !this.value.trim() && attachedFiles.length === 0;
     });
+    btnSend.disabled = true; // disabled by default until user types
 
     // Cmd+Enter and Tab+Enter send, regular Enter adds newline / auto-continues lists
     var tabPressed = false;
@@ -2383,6 +2385,10 @@
             divider.classList.add('dragging');
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
+        });
+
+        divider.addEventListener('dblclick', function() {
+            layout.style.gridTemplateColumns = '50% 5px 1fr';
         });
 
         document.addEventListener('mousemove', function(e) {
