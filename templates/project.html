@@ -269,10 +269,10 @@
         justify-content: center;
         margin-bottom: 0.5rem;
     }
-    .jri-msg {
+    .chat-msg.jri-msg {
         align-self: flex-start;
-        background: transparent;
-        border: none;
+        background: transparent !important;
+        border: none !important;
         padding: 0.3rem 0;
     }
     .btn-jri, .btn-stop, .btn-resume {
@@ -291,8 +291,9 @@
         box-sizing: border-box;
     }
     .btn-jri:disabled {
-        background: var(--border-light) !important;
+        background: var(--card-bg) !important;
         color: var(--text-dim) !important;
+        border: 1px solid var(--border) !important;
         cursor: not-allowed;
     }
     .btn-jri:hover:not(:disabled) { opacity: 0.85; }
