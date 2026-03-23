@@ -134,6 +134,9 @@ def _prepend_attachment_info(message: str, filenames: list[str]) -> str:
     return f"Attachments: {names}\n\n{message}"
 
 
+_active_procs: dict[str, asyncio.subprocess.Process] = {}
+
+
 async def _stream_claude(
     project_name: str,
     project_dir: str,
@@ -142,6 +145,11 @@ async def _stream_claude(
     user_message: str,
 ):
     """Async generator that spawns claude CLI and yields SSE events."""
+    # If Ralphy is already running for this project, wait for it to finish
+    existing = _active_procs.get(project_name)
+    if existing and existing.returncode is None:
+        await existing.wait()
+
     args = _build_claude_args(session_id, is_new_session, user_message)
 
     env = {"BD_ACTOR": "ralphy"}
@@ -160,6 +168,7 @@ async def _stream_claude(
                 stderr=asyncio.subprocess.PIPE,
                 env={**os.environ, **env},
             )
+            _active_procs[project_name] = proc
 
             while True:
                 try:
@@ -229,6 +238,7 @@ async def _stream_claude(
         yield f"data: {json.dumps(event)}\n\n"
 
     finally:
+        _active_procs.pop(project_name, None)
         await sse_bus.publish(project_name, "ralphy_processing", {"status": "end"})
 
 
